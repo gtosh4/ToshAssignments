@@ -1,0 +1,14 @@
+## Interface: 70300
+## Title: Tosh |cff327da3Assignments|r
+## Author: Tosh
+## Notes: Assignments and notifications based on boss-mod timings
+## Version: 0.0.1
+## SavedVariables: ToshAssignmnetsDB
+
+## X-Category: Boss Encounters
+
+embeds.xml
+
+core.lua
+bigwigs.lua
+dbm.lua
