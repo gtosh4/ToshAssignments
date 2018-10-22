@@ -1,4 +1,4 @@
-local _, ns = ...
+local addonName, ns = ...
 local ta = LibStub("AceAddon-3.0"):NewAddon("ToshAssignments", "AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0")
 ns.ta = ta
 
@@ -16,6 +16,10 @@ do
 end
 
 function ta:ADDON_LOADED(self, event, addon)
+    if addon == addonName and IsAddOnLoaded("BigWigs_Core") then
+        ns:LoadBigWigs()
+    end
+
     if addon == "BigWigs_Core" then
         ns:LoadBigWigs()
     end
@@ -27,16 +31,13 @@ end
 
 do
     ta:RegisterChatCommand("ta", "SlashTA")
-
-    if IsAddOnLoaded("BigWigs_Core") then
-        ns:LoadBigWigs()
-    end
-
     ta:RegisterEvent('ADDON_LOADED')
     ta:RegisterEvent('PLAYER_ENTERING_WORLD')
 end
 
 do
+    local EJ_GetNumTiers, EJ_GetInstanceByIndex, EJ_GetEncounterInfoByIndex = EJ_GetNumTiers, EJ_GetInstanceByIndex, EJ_GetEncounterInfoByIndex
+
     local function tiers()
         local tiers = {}
         local current = EJ_GetCurrentTier()
@@ -90,6 +91,29 @@ do
         return encounters
     end
 
+    local function encounterOptions(encounter)
+        local encounterOptions = {
+            name = encounter.name,
+            type = 'group',
+            childGroups = 'tab',
+            args = {},
+        }
+        encounterOptions.args.add = {
+            name = "Create New",
+            type = 'execute',
+            func = function()
+            end,
+        }
+        local notes = {
+            name = "Notes",
+            type = 'group',
+            args = {},
+        }
+        encounterOptions.args.notes = notes
+
+        return encounterOptions
+    end
+
     local function loadEncounterOptions(options)
         local loaded, reason = LoadAddOn("Blizzard_EncounterJournal")
         if not loaded then
@@ -119,13 +143,9 @@ do
                     }
     
                     for eIdx, encounter in ipairs(encounters(instance.id)) do
-                        local encounterOptions = {
-                            name = encounter.name,
-                            type = 'group',
-                            args = {},
-                            order = eIdx,
-                        }
-                        instanceOptions.args[tostring(encounter.id)] = encounterOptions
+                        local eo = encounterOptions(encounter)
+                        eo.order = eIdx
+                        instanceOptions.args[tostring(encounter.id)] = eo
                     end
                     tierOptions.args[tostring(instance.id)] = instanceOptions
                 end
@@ -144,25 +164,25 @@ do
                         args = {},
                         order = idx,
                     }
-    
+
                     for eIdx, encounter in ipairs(encounters(instance.id)) do
-                        local encounterOptions = {
-                            name = encounter.name,
-                            type = 'group',
-                            args = {},
-                            order = eIdx,
-                        }
-                        instanceOptions.args[tostring(encounter.id)] = encounterOptions
+                        local eo = encounterOptions(encounter)
+                        eo.order = eIdx
+                        instanceOptions.args[tostring(encounter.id)] = eo
                     end
                     dungeonOptions.args[tostring(instance.id)] = instanceOptions
                 end
+
+                EJ_SelectTier(EJ_GetCurrentTier())
             end
             tierOptions.args.load = load
             options.args[tostring(tier.index)] = tierOptions
 
-            if tier.current then
-                load.func()
-            end
+            -- When we're loading this, for some reason not all the encounters are loaded.
+            -- Maybe find some way to load it at the correct spot?
+            -- if tier.current then
+            --     load.func()
+            -- end
         end
     end
 
@@ -170,10 +190,10 @@ do
         if self.options then return end
 
         local options = {
-                name = "Tosh Assignments",
-                type = 'group',
-                args = {},
-            }
+            name = "Tosh Assignments",
+            type = 'group',
+            args = {},
+        }
 
         options.args.profile = LibStub("AceDBOptions-3.0"):GetOptionsTable(self.db)
         options.args.profile.order = -1
@@ -183,11 +203,14 @@ do
         LibStub("AceConfig-3.0"):RegisterOptionsTable("ToshAssignments", options)
         LibStub("AceConfigDialog-3.0"):AddToBlizOptions("ToshAssignments", "Tosh Assignments")
         self.options = options
-
-        self:Print("Options Loaded")
     end
 end
 
 function ta:SlashTA()
     LibStub("AceConfigDialog-3.0"):Open("ToshAssignments")
+end
+
+-- Boss Mod functions
+function ta:EncounterOptions(encounterid)
+    return {}
 end
