@@ -3,12 +3,15 @@
 ## Author: Tosh
 ## Notes: Assignments and notifications based on boss-mod timings
 ## Version: 0.0.1
-## SavedVariables: ToshAssignmnetsDB
+## SavedVariables: ToshAssignmentsDB
 
 ## X-Category: Boss Encounters
 
 embeds.xml
 
 core.lua
+config.lua
+spells.lua
 bigwigs.lua
 dbm.lua
+gui.lua
