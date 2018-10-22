@@ -12,13 +12,15 @@ do
 
     function ta:OnInitialize()
         self.db = LibStub("AceDB-3.0"):New("ToshAssignmentsDB", defaultProfile, true)
+        if IsAddOnLoaded("BigWigs_Core") then
+            ns:LoadBigWigs()
+        end
+        ta:RegisterEvent('ADDON_LOADED')
+        ta:RegisterEvent('PLAYER_ENTERING_WORLD')
     end
 end
 
 function ta:ADDON_LOADED(self, event, addon)
-    if addon == addonName and IsAddOnLoaded("BigWigs_Core") then
-        ns:LoadBigWigs()
-    end
 
     if addon == "BigWigs_Core" then
         ns:LoadBigWigs()
@@ -31,8 +33,6 @@ end
 
 do
     ta:RegisterChatCommand("ta", "SlashTA")
-    ta:RegisterEvent('ADDON_LOADED')
-    ta:RegisterEvent('PLAYER_ENTERING_WORLD')
 end
 
 do
@@ -98,10 +98,31 @@ do
             childGroups = 'tab',
             args = {},
         }
+        local name
+        encounterOptions.args.name = {
+            name = "Name",
+            type = 'input',
+            -- width = 'half',
+            order = 10,
+            get = function(info)
+                return name
+            end,
+            set = function(info, value)
+                name = value
+            end,
+        }
         encounterOptions.args.add = {
-            name = "Create New",
+            name = function()
+                return "Create "..(name or "new")
+            end,
             type = 'execute',
+            -- width = 'half',
+            order = 20,
             func = function()
+                self.db.profile[encounter.id] = self.db.profile[encounter.id] or {}
+                self.db.profile[encounter.id][name] = {
+                    name = name,
+                }
             end,
         }
         local notes = {
