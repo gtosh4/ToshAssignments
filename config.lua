@@ -115,7 +115,11 @@ do
             name = "Add Assignment",
             type = 'execute',
             func = function()
-                local assignment = { id=(#note.assignments+1) }
+                local assignment = {
+                    id = (#note.assignments+1),
+                    trigger = {},
+                    actions = {},
+                }
                 assignment.name = assignment.name or "Assignment "..assignment.id
                 note.assignments[assignment.id] = assignment
                 addAssignment(assignment)
