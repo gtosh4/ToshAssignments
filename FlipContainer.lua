@@ -31,7 +31,15 @@ Scripts
 Methods
 -------------------------------------------------------------------------------]]
 local methods = {
+	["OnAcquire"] = function(self)
+		self:SetWidth(300)
+    self:SetHeight(100)
+    self:SetLayout("Fill")
+  end,
+  
   ["AddPage"] = function(self, name, page)
+    page:SetParent(self)
+    page.frame:Hide()
     self.pages[name] = page
   end,
 
@@ -47,9 +55,18 @@ local methods = {
         old.frame:Hide()
       end
       if (not old) or (old ~= page) then
-        self.children[1] = self.pages[name]
+        self.children[1] = page
+        page.frame:Show()
         self:DoLayout()
       end
+    end
+  end,
+
+  ["Hide"] = function(self)
+    local old = self.children[1]
+    if old then
+      old.frame:Hide()
+      self.children[1] = nil
     end
   end,
 

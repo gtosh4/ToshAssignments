@@ -9,6 +9,8 @@
 
 embeds.xml
 
+FlipContainer.lua
+
 core.lua
 config.lua
 spells.lua

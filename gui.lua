@@ -19,6 +19,27 @@ do
         return b
     end
 
+    local function dynamicSlider()
+        local s = gui:Create("Slider")
+        s._SetValue = s.SetValue
+        function s:SetValuefunction(value)
+            local m = self.max
+            while value > (0.8 * m) do
+                m = math.ceil(1.5 * m)
+            end
+            self:SetSliderValues(self.min, m, self.step)
+            self:_SetValue(value)
+        end
+        s._OnRelease = s.OnRelease
+        function s:OnRelease()
+            s.SetValue, s._SetValue = s._SetValue, nil
+            s.OnRelease, s._OnRelease = s._OnRelease, nil
+            if s.OnRelease then s.OnRelease() end
+        end
+
+        return s
+    end
+
     local GetSpellInfo = GetSpellInfo
 
     local function generalGroup(window, windowKey, note, assignment)
@@ -72,8 +93,8 @@ do
         spells:SetDisabled(true)
         trigger:AddChild(spells)
 
-        local spellsinputC = gui:Create('SimpleGroup')
-        spellsinputC:SetLayout("fill")
+        local spellsinputC = gui:Create('FlipContainer')
+        spellsinputC:SetLayout("Flow")
         trigger:AddChild(spellsinputC)
 
         local function spellsinput()
@@ -121,82 +142,134 @@ do
             end
         end
 
-        local timing = gui:Create("Slider")
-        local timingBounds = {
-            min=0,
-            max=10,
-        }
-        timingBounds.set = function(value)
-            timing:SetValue(value)
-            while value > (0.8 * timingBounds.max) do
-                timingBounds.max = math.ceil(1.5 * timingBounds.max)
-            end
-            timing:SetSliderValues(timingBounds.min, timingBounds.max, 0.1)
-        end
-        timingBounds.set(assignment.trigger.before or 0)
+        trigger:AddChild(sectionBreak())
+
+        local timing = dynamicSlider()
+        timing:SetValue(assignment.trigger.before or 0)
         timing:SetLabel("Seconds Before")
         timing:SetCallback("OnMouseUp", function(widget, event, value)
             assignment.trigger.before = value
-            timingBounds.set(value)
         end)
         trigger:AddChild(timing)
-
-        local 
 
         return trigger
     end
 
     local actionTypes = {
-        marker = "Marker",
         bar = "Bar",
+        marker = "Marker",
+    }
+
+    local defaultBarConfig = {
+        duration = 10
     }
     
-    local function markerActionGroup(note, assignment, action)
-    end
-
-    local function barActionGroup(note, assignment, action)
-    end
-    
-    local function actionGroup(note, assignment, action)
+    local function actionGroup(note, assignment)
         local a = gui:Create("DropdownGroup")
         a:SetLayout("Fill")
         a:SetTitle("Type")
         a:SetGroupList(actionTypes)
 
-        a:SetCallback("OnGroupSelected", function(widget, event, group)
-            tab:ReleaseChildren()
-            if group == 'marker' then
-                a:AddChild(markerActionGroup(note, assignment, action))
-            elseif group == 'bar' then
-                a:AddChild(barActionGroup(note, assignment, action))
+        local container = gui:Create("SimpleGroup")
+        container:SetLayout("Flow")
+        a:AddChild(container)
+
+        local delete = gui:Create("Button")
+        delete:SetText("Delete")
+        delete:SetCallback("OnClick", function(widget)
+            local action = a:GetUserData("action")
+            if not action then
+                return
             end
+            assignment.actions[action.id] = nil
+            action.removeOptions()
         end)
-        a:SetGroup('marker')
+        container:AddChild(delete)
+
+        local flip = gui:Create('FlipContainer')
+        flip:SetFullWidth(true)
+        flip:SetFullHeight(true)
+        container:AddChild(flip)
+        
+        local bar = gui:Create("SimpleGroup")
+        bar:SetLayout("Flow")
+        flip:AddPage('bar', bar)
+
+        local barDuration = dynamicSlider()
+        barDuration:SetLabel("Duration")
+        barDuration:SetCallback("OnMouseUp", function(widget, event, value)
+            local action = a:GetUserData("action")
+            if not action then
+                return
+            end
+            action.bar.duration = value
+        end)
+        bar:AddChild(barDuration)
+
+        local marker = gui:Create("SimpleGroup")
+        marker:SetLayout("Flow")
+        flip:AddPage('marker', marker)
+        
+        a:SetCallback("OnGroupSelected", function(widget, event, group)
+            if not group or group == "" then
+                flip:Hide()
+                return
+            end
+            local action = widget:GetUserData("action")
+            if not action then
+                flip:Hide()
+                return
+            end
+
+            flip:ShowPage(group)
+            action.type = group
+
+            action.bar = setmetatable(action.bar or {}, {__index = defaultBarConfig})
+            barDuration:SetSliderValues(0, 30, 0.1)
+            barDuration:SetValue(action.bar.duration)
+        end)
+        a:SetGroup('bar')
+
+        a.SetAction = function(self, action)
+            self:SetUserData("action", action)
+
+            if not action.type then
+                action.type = 'bar'
+            end
+            a:SetGroup(action.type)
+        end
 
         return a
     end
 
     local function actionTreeGroup(note, assignment)
         local t = gui:Create("TreeGroup")
-        t:SetFullWidth(true)
-        t:SetFullHeight(true)
         t:SetLayout("Fill")
 
         local tree = {}
         local actionMap = {}
         for k, action in pairs(assignment.actions) do
             local value = "action"..action.id
-            tree[#tree+1] = {
+            local idx = #tree+1
+            tree[idx] = {
                 value = value,
                 text = "Action "..action.id,
             }
             actionMap[value] = action
+            action.removeOptions = function()
+                table.remove(tree, idx)
+                actionMap[value] = nil
+                t:RefreshTree()
+            end
         end
         tree[#tree+1] = {
             value = "add",
             text = "Add Action",
         }
         t:SetTree(tree)
+
+        local content = actionGroup(note, assignment)
+        t:AddChild(content)
 
         t:SetCallback("OnGroupSelected", function(widget, event, group)
             if not group then
@@ -207,19 +280,29 @@ do
                 }
                 assignment.actions[action.id] = action
                 local value = "action"..action.id
-                table.insert(tree, #tree, {
+                local idx = #tree
+                table.insert(tree, idx, {
                     value = value,
                     text = "Action "..action.id,
                 })
                 actionMap[value] = action
-                t:SelectByValue("")
+                action.removeOptions = function()
+                    table.remove(tree, idx)
+                    actionMap[value] = nil
+                    t:RefreshTree()
+                end
+                t:SelectByValue(value)
             else
                 local action = actionMap[group]
                 if not action then return end
-                t:ReleaseChildren()
-                t:AddChild(actionGroup(note, assignment, action))
+                content:SetAction(action)
             end
         end)
+        if tree[1] then
+            t:SelectByValue(tree[1].value)
+        else
+            content:SetGroup()
+        end
 
         return t
     end
@@ -232,7 +315,7 @@ do
             return
         end
         w = gui:Create('Frame')
-        w:SetLayout("Flow")
+        w:SetLayout("Fill")
         w:SetTitle(assignment.name)
         w:SetCallback("OnClose", function(widget)
             gui:Release(widget)
@@ -241,23 +324,23 @@ do
         windows[windowKey] = w
 
         local tab = gui:Create('TabGroup')
-        tab:SetFullWidth(true)
-        tab:SetFullHeight(true)
+        tab:SetLayout("fill")
         tab:SetTabs({
             {value = 'general', text = 'General'},
             {value = 'trigger', text = 'Trigger'},
             {value = 'actions', text = 'Actions'},
         })
 
+        local flip = gui:Create('FlipContainer')
+        flip:SetLayout("Fill")
+        tab:AddChild(flip)
+
+        flip:AddPage('general', generalGroup(w, windowKey, note, assignment))
+        flip:AddPage('trigger', triggerGroup(note, assignment))
+        flip:AddPage('actions', actionTreeGroup(note, assignment))
+
         tab:SetCallback("OnGroupSelected", function(widget, event, group)
-            tab:ReleaseChildren()
-            if group == 'general' then
-                tab:AddChild(generalGroup(w, windowKey, note, assignment))
-            elseif group == 'trigger' then
-                tab:AddChild(triggerGroup(note, assignment))
-            elseif group == 'actions' then
-                tab:AddChild(actionTreeGroup(note, assignment))
-            end
+            flip:ShowPage(group)
         end)
         tab:SelectTab('general')
 
