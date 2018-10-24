@@ -6,8 +6,7 @@ do
 
     local triggerTypes = {
         time = 'Time',
-        cast = 'Cast',
-        aura = 'Aura',
+        spell = 'Spell',
         add = 'Add',
     }
 
@@ -118,7 +117,7 @@ do
         end)
 
         ttype:SetCallback("OnValueChanged", function(widget, event, key)
-            if key == 'cast' or key == 'aura' then
+            if key == 'spell' then
                 spells:SetDisabled(false)
             else
                 spells:SetDisabled(true)
@@ -127,7 +126,7 @@ do
         end)
 
         ttype:SetValue(assignment.trigger.type)
-        if assignment.trigger.type == 'cast' or assignment.trigger.type == 'aura' then
+        if assignment.trigger.type == 'spell' then
             spells:SetDisabled(false)
 
             if assignment.trigger.spellId then
@@ -157,10 +156,6 @@ do
     local actionTypes = {
         bar = "Bar",
         marker = "Marker",
-    }
-
-    local defaultBarConfig = {
-        duration = 10
     }
     
     local function actionGroup(note, assignment)
@@ -223,7 +218,7 @@ do
             flip:ShowPage(group)
             action.type = group
 
-            action.bar = setmetatable(action.bar or {}, {__index = defaultBarConfig})
+            ta:DecorateAction(action)
             barDuration:SetSliderValues(0, 30, 0.1)
             barDuration:SetValue(action.bar.duration)
         end)

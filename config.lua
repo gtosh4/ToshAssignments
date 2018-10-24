@@ -114,6 +114,12 @@ do
             loadNoteOptions(note, notes)
         end
 
+        encounterOptions.args.header = {
+            name = ("%s (%d) @ %s (%d)"):format(encounter.name, encounter.encounterId, EJ_GetInstanceInfo(encounter.instanceId), encounter.instanceId),
+            type = "header",
+            order = 1,
+        }
+
         local name
         encounterOptions.args.name = {
             name = "Name",
@@ -142,6 +148,7 @@ do
                     encounterId = encounter.encounterId,
                     assignments = {},
                 }
+                ta:DecorateNote(note)
                 ta.db.profile.encounters[encounter.encounterId][name] = note
                 loadNoteOptions(note, notes)
             end,

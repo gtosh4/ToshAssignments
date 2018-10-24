@@ -19,6 +19,11 @@ do
 
     function ta:OnInitialize()
         self.db = LibStub("AceDB-3.0"):New("ToshAssignmentsDB", defaultProfile, true)
+        for _, encounter in pairs(self.db.profile.encounters) do
+            for _, note in pairs(encounter) do
+                self:DecorateNote(note)
+            end
+        end
         self:RegisterChatCommand("ta", "SlashTA")
     end
 
@@ -115,6 +120,31 @@ function ta:SlashTA(option)
         end
     end
     LibStub("AceConfigDialog-3.0"):Open("ToshAssignments")
+end
+
+do -- Add metatables/functions
+    function ta:DecorateNote(note)
+        for _, assign in pairs(note.assignments) do
+            self:DecorateAssignment(assign)
+        end
+    end
+
+    function ta:DecorateAssignment(assignment)
+        if assignment.trigger.type == 'cast' or assignment.trigger.type == 'aura' then
+            assignment.trigger.type = 'spell'
+        end
+        for _, action in pairs(assignment.actions) do
+            self:DecorateAction(action)
+        end
+    end
+
+    local defaultBarConfig = {
+        duration = 10
+    }
+
+    function ta:DecorateAction(action)
+        action.bar = setmetatable(action.bar or {}, {__index = defaultBarConfig})
+    end
 end
 
 -- Boss Mod functions
