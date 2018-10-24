@@ -31,14 +31,14 @@ do
         if IsAddOnLoaded("BigWigs_Core") then
             ns:LoadBigWigs()
         end
-        ta:RegisterEvent('ADDON_LOADED')
-        ta:RegisterEvent('PLAYER_ENTERING_WORLD')
+        self:RegisterEvent('ADDON_LOADED')
+        self:RegisterEvent('PLAYER_ENTERING_WORLD')
         
-        ta:SetupSharing()
+        self:SetupSharing()
     end
 end
 
-function ta:ADDON_LOADED(self, event, addon)
+function ta:ADDON_LOADED(event, addon)
     if addon == "BigWigs_Core" then
         ns:LoadBigWigs()
     end
@@ -105,6 +105,14 @@ function ta:SlashTA(option)
     if option == "test_transmit" then
         self:SendNote(testNote, "WHISPER", GetUnitName("player", true))
         return
+    elseif option == "bw" then
+        for i=1,GetNumAddOns() do
+            local name = GetAddOnInfo(i)
+            if name:sub(1, 7) == "BigWigs" then
+                local loaded = IsAddOnLoaded(i)
+                self:Print(name or "nil", loaded or "nil")
+            end
+        end
     end
     LibStub("AceConfigDialog-3.0"):Open("ToshAssignments")
 end

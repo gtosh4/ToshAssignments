@@ -250,7 +250,6 @@ do
         if fresh then -- do only once
             AceConfig:RegisterOptionsTable("ToshAssignments", self.options)
             AceConfigDialog:AddToBlizOptions("ToshAssignments", "Tosh Assignments")
-            -- AceConfigDialog:SelectGroup("ToshAssignments", tostring(EJ_GetCurrentTier()))
         else
             ta:NotifyConfigChange()
         end

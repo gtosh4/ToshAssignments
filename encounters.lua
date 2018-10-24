@@ -2,8 +2,8 @@ local _, ns = ...
 local ta = ns.ta
 
 do
-    local EJ_GetEncounterInfoByIndex, EJ_GetCurrentTier, EJ_SelectInstance, EJ_GetCurrentTier, EJ_SelectTier, EJ_GetTierInfo =
-          EJ_GetEncounterInfoByIndex, EJ_GetCurrentTier, EJ_SelectInstance, EJ_GetCurrentTier, EJ_SelectTier, EJ_GetTierInfo
+    local EJ_GetEncounterInfoByIndex, EJ_GetCurrentTier, EJ_SelectInstance, EJ_SelectTier, EJ_GetTierInfo, EJ_GetInstanceByIndex =
+          EJ_GetEncounterInfoByIndex, EJ_GetCurrentTier, EJ_SelectInstance, EJ_SelectTier, EJ_GetTierInfo, EJ_GetInstanceByIndex
 
     local function encounters(instanceId)
         EJ_SelectInstance(instanceId)
@@ -55,16 +55,12 @@ do
         local tier = tiers[index]
         if not tier then
             local info = { EJ_GetTierInfo(index) }
-            if not info[1] then
-                ta:Printf("No info found for tier %d", index)
-                return
-            end
+            if not info[1] then return end
             tier = {
                 index = index,
                 name = info[1],
                 link = info[2],
             }
-            ta:Printf("%s (tier %d) loaded", tier.name, tier.index)
             tiers[index] = tier
             
             local old = EJ_GetCurrentTier()
