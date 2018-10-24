@@ -98,8 +98,9 @@ local function Constructor()
 	local widget = {
     frame     = frame,
     pages     = {},
-		content   = content,
-		type      = Type
+    content   = content,
+    -- Based on SimpleFrame - fake the type out so skinners such as ElvUI skin this similarly
+		type      = "SimpleFrame"
 	}
 	for method, func in pairs(methods) do
 		widget[method] = func

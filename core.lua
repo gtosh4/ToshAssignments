@@ -19,7 +19,10 @@ do
 
     function ta:OnInitialize()
         self.db = LibStub("AceDB-3.0"):New("ToshAssignmentsDB", defaultProfile, true)
-        
+        self:RegisterChatCommand("ta", "SlashTA")
+    end
+
+    function ta:OnEnable()
         ta:RegisterMessage("ToshAssignments_UpdateConfig", function() ta:InitializeOptions(true) end)
 		self.db.RegisterCallback(ta, "OnProfileChanged", profileUpdate)
 		self.db.RegisterCallback(ta, "OnProfileCopied", profileUpdate)
@@ -30,6 +33,8 @@ do
         end
         ta:RegisterEvent('ADDON_LOADED')
         ta:RegisterEvent('PLAYER_ENTERING_WORLD')
+        
+        ta:SetupSharing()
     end
 end
 
@@ -43,11 +48,64 @@ function ta:PLAYER_ENTERING_WORLD()
     ta:InitializeOptions()
 end
 
-do
-    ta:RegisterChatCommand("ta", "SlashTA")
-end
 
-function ta:SlashTA()
+local testNote = {
+    ["enabled"] = true,
+    ["encounterId"] = 2168,
+    ["name"] = "Test Note",
+    ["assignments"] = {
+        {
+            ["name"] = "Tosh",
+            ["trigger"] = {
+                ["before"] = 2,
+                ["type"] = "cast",
+                ["spellId"] = 271296,
+            },
+            ["actions"] = {
+                {
+                    ["id"] = 1,
+                    ["type"] = "bar",
+                    ["bar"] = {
+                    },
+                }, -- [1]
+                {
+                    ["id"] = 2,
+                    ["type"] = "bar",
+                    ["bar"] = {
+                        ["duration"] = 15,
+                    },
+                }, -- [2]
+                {
+                    ["id"] = 3,
+                    ["type"] = "marker",
+                    ["bar"] = {
+                    },
+                }, -- [3]
+            },
+            ["id"] = 1,
+        }, -- [1]
+        {
+            ["name"] = "Assignment 2",
+            ["trigger"] = {
+            },
+            ["actions"] = {
+                {
+                    ["id"] = 1,
+                    ["type"] = "bar",
+                    ["bar"] = {
+                    },
+                }, -- [1]
+            },
+            ["id"] = 2,
+        }, -- [2]
+    },
+}
+
+function ta:SlashTA(option)
+    if option == "test_transmit" then
+        self:SendNote(testNote, "WHISPER", GetUnitName("player", true))
+        return
+    end
     LibStub("AceConfigDialog-3.0"):Open("ToshAssignments")
 end
 

@@ -9,59 +9,6 @@ do
         AceConfigRegistry:NotifyChange("ToshAssignments")
     end
 
-    local function tiers()
-        local tiers = {}
-        local current = EJ_GetCurrentTier()
-        for i=1,EJ_GetNumTiers() do
-            local tier = {
-                index = i,
-                current = (i == current),
-            }
-            tier.name = EJ_GetTierInfo(i)
-            table.insert(tiers, tier)
-        end
-        return tiers
-    end
-
-    local function raids()
-        local instances = {}
-        local index = 1
-        while true do
-            local instance = {}
-            instance.id, instance.name = EJ_GetInstanceByIndex(index, true)
-            if not instance.name then break end
-            table.insert(instances, instance)
-            index = index + 1
-        end
-        return instances
-    end
-        
-    local function dungeons()
-        local instances = {}
-        local index = 1
-        while true do
-            local instance = {}
-            instance.id, instance.name = EJ_GetInstanceByIndex(index, false)
-            if not instance.name then break end
-            table.insert(instances, instance)
-            index = index + 1
-        end
-        return instances
-    end
-
-    local function encounters(instanceId)
-        local encounters = {}
-        local index = 1
-        while true do
-            local encounter = {instanceId = instanceId}
-            encounter.name, _, encounter.id = EJ_GetEncounterInfoByIndex(index, instanceId)
-            if not encounter.name then break end
-            table.insert(encounters, encounter)
-            index = index + 1
-        end
-        return encounters
-    end
-
     local function loadNoteOptions(note, noteGroup)
         note.assignments = note.assignments or {}
 
@@ -92,11 +39,25 @@ do
                     width = 'full',
                     order = 3,
                 },
+                assignments = {
+                    name = "Assignments",
+                    type = 'group',
+                    inline = true,
+                    args = {
+                        description = {
+                            name = "Click on an assignment to open its configuration",
+                            type = 'description',
+                            order = 1,
+                        },
+                    },
+                    order = 4,
+                },
             },
         }
+        local assignments = noteOptions.args.assignments
 
         local addAssignment = function(assignment)
-            noteOptions.args["assign"..assignment.id] = {
+            assignments.args["assign"..assignment.id] = {
                 name = function() return assignment.name end,
                 type = 'execute',
                 func = function()
@@ -106,12 +67,12 @@ do
                 order = 10+assignment.id,
             }
             assignment.removeOptions = function()
-                noteOptions.args["assign"..assignment.id] = nil
+                assignments.args["assign"..assignment.id] = nil
                 ta:NotifyConfigChange()
             end
         end
 
-        noteOptions.args.addAssignment = {
+        assignments.args.addAssignment = {
             name = "Add Assignment",
             type = 'execute',
             func = function()
@@ -149,7 +110,7 @@ do
             order = -1,
         }
         encounterOptions.args.notes = notes
-        for _, note in pairs(ta.db.profile.encounters[encounter.id]) do
+        for _, note in pairs(ta.db.profile.encounters[encounter.encounterId]) do
             loadNoteOptions(note, notes)
         end
 
@@ -178,10 +139,10 @@ do
                 local note = {
                     name = name,
                     enabled = true,
-                    encounterId = encounter.id,
+                    encounterId = encounter.encounterId,
                     assignments = {},
                 }
-                ta.db.profile.encounters[encounter.id][name] = note
+                ta.db.profile.encounters[encounter.encounterId][name] = note
                 loadNoteOptions(note, notes)
             end,
         }
@@ -192,77 +153,84 @@ do
     local function loadEncounterOptions(options)
         local loaded, reason = LoadAddOn("Blizzard_EncounterJournal")
         if not loaded then
-            print("Could not load EncounterJournal: ", reason)
+            ta:Printf("Could not load EncounterJournal: %s", reason)
             return
         end
 
-        for _, tier in ipairs(tiers()) do
+        local legacy = {
+            name = "Legacy Tiers",
+            type = 'group',
+            order = 1000,
+            args = {},
+        }
+        options.args.legacy = legacy
+
+        local maxTiers = EJ_GetNumTiers()
+        for i=1,maxTiers do
+            local tier = ns:GetTier(i)
+            if not tier then 
+                ta:Printf("No tier info for tier %d", i)
+                break
+            end
             local tierOptions = {
                 name = tier.name,
                 type = 'group',
-                order = tier.index,
+                order = (maxTiers - tier.index),
                 args = {},
             }
-            local load = {name="Load", type='execute'}
-            load.func = function()
-                tierOptions.args = {}
-
-                EJ_SelectTier(tier.index)
-
-                for idx, instance in ipairs(raids()) do
-                    local instanceOptions = {
-                        name = instance.name,
-                        type = 'group',
-                        args = {},
-                        order = idx,
-                    }
-    
-                    for eIdx, encounter in ipairs(encounters(instance.id)) do
-                        local eo = encounterOptions(encounter)
-                        eo.order = eIdx
-                        instanceOptions.args[tostring(encounter.id)] = eo
-                    end
-                    tierOptions.args[tostring(instance.id)] = instanceOptions
-                end
-
-                local dungeonOptions = {
-                    name = "Dungeons",
+            local maxraids = #tier.raids
+            for idx, raid in pairs(tier.raids) do
+                local instanceOptions = {
+                    name = raid.name,
                     type = 'group',
                     args = {},
-                    order = -1,
+                    order = (maxraids - idx),
                 }
-                tierOptions.args["dungeons"] = dungeonOptions
-                for idx, instance in ipairs(dungeons()) do
-                    local instanceOptions = {
-                        name = instance.name,
-                        type = 'group',
-                        args = {},
-                        order = idx,
-                    }
-
-                    for eIdx, encounter in ipairs(encounters(instance.id)) do
-                        local eo = encounterOptions(encounter)
-                        eo.order = eIdx
-                        instanceOptions.args[tostring(encounter.id)] = eo
-                    end
-                    dungeonOptions.args[tostring(instance.id)] = instanceOptions
+                for eIdx, encounter in ipairs(raid.encounters) do
+                    local eo = encounterOptions(encounter)
+                    eo.order = eIdx
+                    instanceOptions.args[tostring(encounter.encounterId)] = eo
                 end
-
-                EJ_SelectTier(EJ_GetCurrentTier())
+                if i == maxTiers then
+                    options.args[tostring(raid.instanceId)] = instanceOptions
+                else
+                    tierOptions.args[tostring(raid.instanceId)] = instanceOptions
+                end
             end
-            tierOptions.args.load = load
-            options.args[tostring(tier.index)] = tierOptions
 
-            -- When we're loading this, for some reason not all the encounters are loaded.
-            -- Maybe find some way to load it at the correct spot?
-            -- if tier.current then
-            --     load.func()
-            -- end
+            local dungeonOptions = {
+                name = "Dungeons",
+                type = 'group',
+                order = 500,
+                args = {},
+            }
+            for idx, dungeon in ipairs(tier.dungeons) do
+                local instanceOptions = {
+                    name = dungeon.name,
+                    type = 'group',
+                    args = {},
+                    order = idx,
+                }
+                for eIdx, encounter in ipairs(dungeon.encounters) do
+                    local eo = encounterOptions(encounter)
+                    eo.order = eIdx
+                    instanceOptions.args[tostring(encounter.encounterId)] = eo
+                end
+                dungeonOptions.args[tostring(dungeon.instanceId)] = instanceOptions
+            end
+
+            if i == maxTiers then
+                options.args.dungeons = dungeonOptions
+            else
+                tierOptions.args.dungeons = dungeonOptions
+                legacy.args[tostring(i)] = tierOptions
+            end
         end
     end
 
     local AceConfig = LibStub("AceConfig-3.0")
     local AceConfigDialog = LibStub("AceConfigDialog-3.0")
+    local AceTimer = LibStub("AceTimer-3.0")
     function ta:InitializeOptions(force)
         if self.options and not force then return end
 
@@ -282,7 +250,9 @@ do
         if fresh then -- do only once
             AceConfig:RegisterOptionsTable("ToshAssignments", self.options)
             AceConfigDialog:AddToBlizOptions("ToshAssignments", "Tosh Assignments")
-            AceConfigDialog:SelectGroup("ToshAssignments", tostring(EJ_GetCurrentTier()))
+            -- AceConfigDialog:SelectGroup("ToshAssignments", tostring(EJ_GetCurrentTier()))
+        else
+            ta:NotifyConfigChange()
         end
     end
 end

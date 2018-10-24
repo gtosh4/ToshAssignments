@@ -42,7 +42,7 @@ do
 
     local GetSpellInfo = GetSpellInfo
 
-    local function generalGroup(window, windowKey, note, assignment)
+    local function generalGroup(window, note, assignment)
         local gen = gui:Create("SimpleGroup")
         gen:SetLayout("Flow")
 
@@ -64,8 +64,7 @@ do
         delete:SetCallback("OnClick", function(widget)
             note.assignments[assignment.id] = nil
             assignment.removeOptions()
-            gui:Release(window)
-            windows[windowKey] = nil
+            window:Hide()
         end)
         gen:AddChild(delete)
 
@@ -335,7 +334,7 @@ do
         flip:SetLayout("Fill")
         tab:AddChild(flip)
 
-        flip:AddPage('general', generalGroup(w, windowKey, note, assignment))
+        flip:AddPage('general', generalGroup(w, note, assignment))
         flip:AddPage('trigger', triggerGroup(note, assignment))
         flip:AddPage('actions', actionTreeGroup(note, assignment))
 
