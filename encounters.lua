@@ -29,9 +29,9 @@ do
         return es
     end
 
-    local tiers = {}
+    local instancesById = {} -- Useful for finding out which instance we're currently in
 
-    local function instances(isRaid)
+    local function instances(tier, isRaid)
         local instances = {}
         local index = 1
         while true do
@@ -43,13 +43,17 @@ do
                 desc = info[3],
                 mapId = info[7],
                 link = info[8],
+                tier = tier,
             }
             instance.encounters = encounters(instance.instanceId)
             instances[index] = instance
+            instancesById[instance.instanceId] = instance
             index = index + 1
         end
         return instances
     end
+
+    local tiers = {}
         
     function ns:GetTier(index)
         local tier = tiers[index]
@@ -65,12 +69,20 @@ do
             
             local old = EJ_GetCurrentTier()
             EJ_SelectTier(index)
-            tier.dungeons = instances(false)
-            tier.raids = instances(true)
+            tier.dungeons = instances(index, false)
+            tier.raids = instances(index, true)
             if old then
                 EJ_SelectTier(old)
             end
         end
         return tier
+    end
+
+    function ns:GetInstanceById(id)
+        local i = instancesById[id]
+        if not i then
+            ta:Printf("No instance for id %d", id)
+        end
+        return i
     end
 end

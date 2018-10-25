@@ -106,20 +106,42 @@ local testNote = {
     },
 }
 
-function ta:SlashTA(option)
-    if option == "test_transmit" then
-        self:SendNote(testNote, "WHISPER", GetUnitName("player", true))
-        return
-    elseif option == "bw" then
-        for i=1,GetNumAddOns() do
-            local name = GetAddOnInfo(i)
-            if name:sub(1, 7) == "BigWigs" then
-                local loaded = IsAddOnLoaded(i)
-                self:Print(name or "nil", loaded or "nil")
+do
+    local AceConfigDialog = LibStub("AceConfigDialog-3.0")
+    local GetBestMapForUnit, EJ_GetInstanceForMap, EJ_GetNumTiers, GetInstanceInfo = C_Map.GetBestMapForUnit, EJ_GetInstanceForMap, EJ_GetNumTiers, GetInstanceInfo
+
+    function ta:SlashTA(option)
+        if option == "test_transmit" then
+            self:SendNote(testNote, "WHISPER", GetUnitName("player", true))
+            return
+        elseif option == "bw" then
+            for i=1,GetNumAddOns() do
+                local name = GetAddOnInfo(i)
+                if name:sub(1, 7) == "BigWigs" then
+                    local loaded = IsAddOnLoaded(i)
+                    self:Print(name or "nil", loaded or "nil")
+                end
             end
         end
+        AceConfigDialog:Open("ToshAssignments")
+        local mapID = GetBestMapForUnit("player")
+        local instanceID = mapID and EJ_GetInstanceForMap(mapID) or 0
+        local _, instanceType = GetInstanceInfo()
+        local instance = ns:GetInstanceById(instanceID)
+        if instance then
+            local maxTiers = EJ_GetNumTiers()
+            local params = {}
+            if instance.tier ~= maxTiers then
+                params[#params+1] = "legacy"
+                params[#params+1] = tostring(instance.tier)
+            end
+            if instanceType == "dungeon" then
+                params[#params+1] = "dungeons"
+            end
+            params[#params+1] = tostring(instanceID)
+            AceConfigDialog:SelectGroup("ToshAssignments", unpack(params))
+        end
     end
-    LibStub("AceConfigDialog-3.0"):Open("ToshAssignments")
 end
 
 do -- Add metatables/functions

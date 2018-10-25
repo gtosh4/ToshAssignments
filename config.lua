@@ -39,6 +39,19 @@ do
                     width = 'full',
                     order = 3,
                 },
+                showothers = {
+                    name = "Show assignments assigned to other players",
+                    type = 'toggle',
+                    get = function() return note.showOthers or false end,
+                    set = function(info, value) note.showOthers = value end,
+                    order = 4,
+                },
+                break2 = {
+                    name = "",
+                    type = 'description',
+                    width = 'full',
+                    order = 5,
+                },
                 assignments = {
                     name = "Assignments",
                     type = 'group',
@@ -50,7 +63,7 @@ do
                             order = 1,
                         },
                     },
-                    order = 4,
+                    order = 100,
                 },
             },
         }

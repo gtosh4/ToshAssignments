@@ -39,11 +39,11 @@ do
         return s
     end
 
-    local GetSpellInfo = GetSpellInfo
+    local GetSpellInfo, tinsert, tremove = GetSpellInfo, table.insert, table.remove
 
     local function generalGroup(window, note, assignment)
         local gen = gui:Create("SimpleGroup")
-        gen:SetLayout("Flow")
+        gen:SetLayout("List")
 
         local name = gui:Create('EditBox')
         name:SetText(assignment.name)
@@ -66,6 +66,60 @@ do
             window:Hide()
         end)
         gen:AddChild(delete)
+
+        local assignToPlayers = gui:Create("CheckBox")
+        assignToPlayers:SetLabel("Assign to Players")
+        gen:AddChild(assignToPlayers)
+
+        local playersGroup = gui:Create("SimpleGroup")
+        playersGroup:SetFullWidth(true)
+        playersGroup:SetFullHeight(true)
+        playersGroup:SetLayout("Fill")
+        gen:AddChild(playersGroup)
+
+        local playersScroll = gui:Create("ScrollFrame")
+        playersScroll:SetLayout("Flow")
+        playersGroup:AddChild(playersScroll)
+
+        local redrawPlayerBoxes
+        redrawPlayerBoxes = function()
+            playersScroll:ReleaseChildren()
+            if assignment.players then
+                for idx, player in ipairs(assignment.players) do
+                    local playerBox = gui:Create("EditBox")
+                    playerBox:SetFullWidth(true)
+                    playerBox:SetText(player)
+                    playersScroll:AddChild(playerBox)
+                    playerBox:SetCallback("OnEnterPressed", function(widget, event, text)
+                        if text and text ~= "" then
+                            tinsert(assignment.players, text)
+                        else
+                            tremove(assignment.players, idx)
+                            redrawPlayerBoxes()
+                        end
+                    end)
+                end
+                local newPlayerBox = gui:Create("EditBox")
+                newPlayerBox:SetFullWidth(true)
+                playersScroll:AddChild(newPlayerBox)
+                newPlayerBox:SetCallback("OnEnterPressed", function(widget, event, text)
+                    if text and text ~= "" then
+                        tinsert(assignment.players, text)
+                        redrawPlayerBoxes()
+                    end
+                end)
+            end
+        end
+
+        assignToPlayers:SetCallback("OnValueChanged", function(widget, event, value)
+            if value then
+                assignment.players = assignment.players or {}
+            else
+                assignment.players = nil
+            end
+            redrawPlayerBoxes()
+        end)
+        assignToPlayers:SetValue(assignment.players ~= nil)
 
         return gen
     end
