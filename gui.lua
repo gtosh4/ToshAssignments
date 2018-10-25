@@ -120,6 +120,7 @@ do
             redrawPlayerBoxes()
         end)
         assignToPlayers:SetValue(assignment.players ~= nil)
+        redrawPlayerBoxes() -- Have to manually call it because OnValueChanged is only fired for the mouse even on CheckBox
 
         return gen
     end
