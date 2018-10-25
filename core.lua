@@ -110,20 +110,7 @@ do
     local AceConfigDialog = LibStub("AceConfigDialog-3.0")
     local GetBestMapForUnit, EJ_GetInstanceForMap, EJ_GetNumTiers, GetInstanceInfo = C_Map.GetBestMapForUnit, EJ_GetInstanceForMap, EJ_GetNumTiers, GetInstanceInfo
 
-    function ta:SlashTA(option)
-        if option == "test_transmit" then
-            self:SendNote(testNote, "WHISPER", GetUnitName("player", true))
-            return
-        elseif option == "bw" then
-            for i=1,GetNumAddOns() do
-                local name = GetAddOnInfo(i)
-                if name:sub(1, 7) == "BigWigs" then
-                    local loaded = IsAddOnLoaded(i)
-                    self:Print(name or "nil", loaded or "nil")
-                end
-            end
-        end
-        AceConfigDialog:Open("ToshAssignments")
+    local function getCurrentInstanceParams()
         local mapID = GetBestMapForUnit("player")
         local instanceID = mapID and EJ_GetInstanceForMap(mapID) or 0
         local _, instanceType = GetInstanceInfo()
@@ -139,8 +126,29 @@ do
                 params[#params+1] = "dungeons"
             end
             params[#params+1] = tostring(instanceID)
+            return params
+        end
+    end
+
+    function ta:SlashTA(option)
+        if option == "test_transmit" then
+            self:SendNote(testNote, "WHISPER", GetUnitName("player", true))
+            return
+        elseif option == "bw" then
+            for i=1,GetNumAddOns() do
+                local name = GetAddOnInfo(i)
+                if name:sub(1, 7) == "BigWigs" then
+                    local loaded = IsAddOnLoaded(i)
+                    self:Print(name or "nil", loaded or "nil")
+                end
+            end
+        end
+
+        local params = getCurrentInstanceParams()
+        if params then
             AceConfigDialog:SelectGroup("ToshAssignments", unpack(params))
         end
+        AceConfigDialog:Open("ToshAssignments")
     end
 end
 
@@ -155,18 +163,42 @@ do -- Add metatables/functions
         if assignment.trigger.type == 'cast' or assignment.trigger.type == 'aura' then
             assignment.trigger.type = 'spell'
         end
+        assignment.onPlayersChange = function() end -- Dummy function to hook
         for _, action in pairs(assignment.actions) do
             self:DecorateAction(action)
         end
     end
 
     local defaultBarConfig = {
-        duration = 10
+        duration = 10,
+        icon = 'none',
+    }
+
+    local defaultMarkerConfig = {
+        type = 'auto',
     }
 
     function ta:DecorateAction(action)
         action.bar = setmetatable(action.bar or {}, {__index = defaultBarConfig})
+        action.marker = setmetatable(action.marker or {}, {__index = defaultMarkerConfig})
     end
 end
 
--- Boss Mod functions
+ns.raidIconStrings = {
+    [1] = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:0|t",
+    [2] = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_2:0|t",
+    [3] = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_3:0|t",
+    [4] = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_4:0|t",
+    [5] = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_5:0|t",
+    [6] = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_6:0|t",
+    [7] = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_7:0|t",
+    [8] = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_8:0|t",
+}
+
+ns.raidIconNumbers = {}
+do
+    for k,_ in pairs(ns.raidIconStrings) do
+        -- Texture id list for raid icons 1-8 is 137001-137008
+        ns.raidIconNumbers[k] = k+137000
+    end
+end

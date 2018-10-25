@@ -92,11 +92,11 @@ do
                     playersScroll:AddChild(playerBox)
                     playerBox:SetCallback("OnEnterPressed", function(widget, event, text)
                         if text and text ~= "" then
-                            tinsert(assignment.players, text)
+                            assignment.players[idx] = text
                         else
                             tremove(assignment.players, idx)
-                            redrawPlayerBoxes()
                         end
+                        assignment.onPlayersChange()
                     end)
                 end
                 local newPlayerBox = gui:Create("EditBox")
@@ -212,6 +212,22 @@ do
         bar = "Bar",
         marker = "Marker",
     }
+
+    local markerTypes = {
+        none = "",
+    }
+
+    local iconTypes = {
+        none = "None",
+        auto = "Auto",
+    }
+    do
+        for k, v in pairs(ns.raidIconStrings) do
+            k = "marker"..k
+            markerTypes[k] = v
+            iconTypes[k] = v
+        end
+    end
     
     local function actionGroup(note, assignment)
         local a = gui:Create("DropdownGroup")
@@ -240,6 +256,7 @@ do
         flip:SetFullHeight(true)
         container:AddChild(flip)
         
+        --[[  BAR  ]]--
         local bar = gui:Create("SimpleGroup")
         bar:SetLayout("Flow")
         flip:AddPage('bar', bar)
@@ -255,9 +272,88 @@ do
         end)
         bar:AddChild(barDuration)
 
+        local barIcon = gui:Create("Dropdown")
+        bar:AddChild(barIcon)
+        barIcon:SetLabel("Icon")
+        barIcon:SetList(iconTypes)
+        barIcon:SetCallback("OnValueChanged", function(widget, event, value)
+            local action = a:GetUserData("action")
+            if not action then return end
+            action.bar.icon = value
+        end)
+
+        bar.frame:HookScript("OnShow", function()
+            local action = a:GetUserData("action")
+            if not action then return end
+
+            barDuration:SetSliderValues(0, 30, 0.1)
+            barDuration:SetValue(action.bar.duration)
+            barIcon:SetValue(action.bar.icon)
+        end)
+
+        --[[  MARKER  ]]--
         local marker = gui:Create("SimpleGroup")
-        marker:SetLayout("Flow")
+        marker:SetLayout("List")
         flip:AddPage('marker', marker)
+        
+        local function playerMaker(action, player)
+            local markerType = gui:Create("Dropdown")
+            markerType:SetList(markerTypes)
+            markerType:SetLabel(player)
+            markerType:SetCallback("OnValueChanged", function(widget, event, value)
+                local action = a:GetUserData("action")
+                if not action then return end
+                action.marker.marks[player] = value
+            end)
+            if action then
+                action.marker.marks = action.marker.marks or {}
+                markerType:SetValue(action.marker.marks[player])
+            end
+            return markerType
+        end
+        
+        local redrawMarkers
+        redrawMarkers = function()
+            marker:ReleaseChildren()
+            if assignment.players and #assignment.players > 0 then
+                for _, player in ipairs(assignment.players) do
+                    marker:AddChild(playerMaker(a:GetUserData("action"), player))
+                end
+            else
+                local action = a:GetUserData("action")
+                if not action then return end
+                action.marker.marks = action.marker.marks or {}
+                for player, mark in pairs(action.marker.marks) do
+                    local playerMarkC = gui:Create("SimpleGroup")
+                    playerMarkC:SetFullWidth(true)
+                    marker:AddChild(playerMarkC)
+                    playerMarkC:SetLayout("Flow")
+                    local playerName = gui:Create("EditBox")
+                    playerMarkC:AddChild(playerName)
+                    playerName:SetText(player)
+                    playerName:SetCallback("OnEnterPressed", function(widget, event, text)
+                        if text and text ~= "" then
+                            action.marker.marks[text], action.marker.marks[player] = action.marker.marks[player], nil
+                        else
+                            action.marker.marks[player] = nil
+                        end
+                        redrawMarkers()
+                    end)
+                    playerMarkC:AddChild(playerMaker(a:GetUserData("action"), player))
+                end
+                local newMarker = gui:Create("EditBox")
+                marker:AddChild(newMarker)
+                newMarker:SetLabel("Add Player")
+                newMarker:SetCallback("OnEnterPressed", function(widget, event, text)
+                    if text and text ~= "" then
+                        action.marker.marks[text] = ""
+                        redrawMarkers()
+                    end
+                end)
+            end
+        end
+        marker.frame:HookScript("OnShow", redrawMarkers)
+        
         
         a:SetCallback("OnGroupSelected", function(widget, event, group)
             if not group or group == "" then
@@ -269,13 +365,9 @@ do
                 flip:Hide()
                 return
             end
-
-            flip:ShowPage(group)
             action.type = group
-
             ta:DecorateAction(action)
-            barDuration:SetSliderValues(0, 30, 0.1)
-            barDuration:SetValue(action.bar.duration)
+            flip:ShowPage(group)
         end)
         a:SetGroup('bar')
 
