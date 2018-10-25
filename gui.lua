@@ -73,7 +73,6 @@ do
 
         local playersGroup = gui:Create("SimpleGroup")
         playersGroup:SetFullWidth(true)
-        playersGroup:SetFullHeight(true)
         playersGroup:SetLayout("Fill")
         gen:AddChild(playersGroup)
 
