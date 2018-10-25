@@ -281,15 +281,6 @@ do
             action.bar.icon = value
         end)
 
-        bar.frame:HookScript("OnShow", function()
-            local action = a:GetUserData("action")
-            if not action then return end
-
-            barDuration:SetSliderValues(0, 30, 0.1)
-            barDuration:SetValue(action.bar.duration)
-            barIcon:SetValue(action.bar.icon)
-        end)
-
         --[[  MARKER  ]]--
         local marker = gui:Create("SimpleGroup")
         marker:SetLayout("List")
@@ -351,8 +342,19 @@ do
                 end)
             end
         end
-        marker.frame:HookScript("OnShow", redrawMarkers)
         
+        flip:SetCallback("OnShowPage", function(widget, event, page)
+            local action = a:GetUserData("action")
+            if not action then return end
+
+            if page == 'bar' then
+                barDuration:SetSliderValues(0, 30, 0.1)
+                barDuration:SetValue(action.bar.duration)
+                barIcon:SetValue(action.bar.icon)
+            elseif page == 'marker' then
+                redrawMarkers()
+            end
+        end)
         
         a:SetCallback("OnGroupSelected", function(widget, event, group)
             if not group or group == "" then

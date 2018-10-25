@@ -56,10 +56,7 @@ local methods = {
       end
       if (not old) or (old ~= page) then
         self.children[1] = page
-        if type(page.OnShow) == 'function' then
-          page.OnShow()
-        end
-
+        self:Fire("OnShowPage", name)
         page.frame:Show()
         self:DoLayout()
       end
