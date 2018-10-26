@@ -163,6 +163,7 @@ do -- Add metatables/functions
         if assignment.trigger.type == 'cast' or assignment.trigger.type == 'aura' then
             assignment.trigger.type = 'spell'
         end
+        assignment.trigger.eventNumber = assignment.trigger.eventNumber or "*"
         assignment.onPlayersChange = function() end -- Dummy function to hook
         for _, action in pairs(assignment.actions) do
             self:DecorateAction(action)

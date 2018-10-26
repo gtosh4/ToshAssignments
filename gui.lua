@@ -149,24 +149,24 @@ do
         spellsinputC:SetLayout("Flow")
         trigger:AddChild(spellsinputC)
 
-        local function spellsinput()
-            local si = gui:Create("EditBox")
-            si:SetLabel("Spell Id")
-            si:SetCallback("OnEnterPressed", function(widget, event, text)
-                local n = tonumber(text)
-                if n then
-                    assignment.trigger.spellId = n
-                end
-            end)
-            return si
-        end
+        local si = gui:Create("EditBox")
+        si:SetLabel("Spell Id")
+        si:SetCallback("OnEnterPressed", function(widget, event, text)
+            local n = tonumber(text)
+            if n then
+                assignment.trigger.spellId = n
+            end
+        end)
+        si:SetWidth(100)
+        spellsinputC:AddPage("spellid", si)
+        spellsinputC:SetWidth(100)
 
         spells:SetCallback("OnValueChanged", function(widget, event, key)
             if key == 0 then
-                spellsinputC:AddChild(spellsinput())
+                spellsinputC:ShowPage("spellid")
             else
                 assignment.trigger.spellId = key
-                spellsinputC:ReleaseChildren()
+                spellsinputC:Hide()
             end
         end)
 
@@ -203,6 +203,25 @@ do
             assignment.trigger.before = value
         end)
         trigger:AddChild(timing)
+
+        local numberC = gui:Create("InlineGroup")
+        numberC:SetFullWidth(true)
+        numberC:SetTitle("Event Number")
+        trigger:AddChild(numberC)
+
+        local numberDesc = gui:Create("Label")
+        numberDesc:SetText("Which cast/add/etc numbers does this assignment apply?|n* = all events|nYou can specify ranges such as 1-3|nor comma separated lists such as 1,3,5,7")
+        numberC:AddChild(numberDesc)
+
+        local number = gui:Create("EditBox")
+        number:SetText(assignment.trigger.eventNumber)
+        number:SetCallback("OnEnterPressed", function(widget, event, text)
+            if not text then
+                number:SetText("*")
+            end
+            assignment.trigger.eventNumber = text or "*"
+        end)
+        numberC:AddChild(number)
 
         return trigger
     end

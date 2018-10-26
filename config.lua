@@ -40,7 +40,8 @@ do
                     order = 3,
                 },
                 showothers = {
-                    name = "Show assignments assigned to other players",
+                    name = "Show Others",
+                    desc = "Show assignments assigned to other players",
                     type = 'toggle',
                     get = function() return note.showOthers or false end,
                     set = function(info, value) note.showOthers = value end,
@@ -51,6 +52,20 @@ do
                     type = 'description',
                     width = 'full',
                     order = 5,
+                },
+                share = {
+                    name = "Share",
+                    type = 'execute',
+                    func = function()
+                        ta:ShareNote(note)
+                    end,
+                    order = 6,
+                },
+                break3 = {
+                    name = "",
+                    type = 'description',
+                    width = 'full',
+                    order = 7,
                 },
                 assignments = {
                     name = "Assignments",

@@ -36,7 +36,6 @@ do
             windows[note.name] = nil
         end)
         w:SetCallback("OnClick", function(widget, event, okay)
-            self:Print("OnClick", okay)
             if okay == true then
                 self.db.profile.encounters[note.encounterId][note.name] = note
                 self:InitializeOptions(true)
@@ -149,5 +148,54 @@ do
         local encoded = LibDeflate:EncodeForWoWAddonChannel(compressed)
         
 	    self:SendCommMessage(commPrefix, encoded, channel, target, "NORMAL")
+    end
+
+    local shareW
+    function ta:ShareNote(note)
+        if shareW then shareW:Release() end
+        shareW = gui:Create('DialogFrame')
+        shareW:SetWidth(400)
+        shareW:SetHeight(200)
+        shareW:SetTitle(note.name)
+        shareW:SetOkayText("Share")
+
+        local withValue
+        local with = gui:Create('Dropdown')
+        with:SetLabel("Share with...")
+        with:SetList({
+            group = "Group",
+            player = "Player"
+        })
+        shareW:AddChild(with)
+
+        local withTargetVal
+        local withTarget = gui:Create("EditBox")
+        withTarget:SetCallback("OnEnterPressed", function(widget, event, text)
+            withTargetVal = text
+        end)
+        shareW:AddChild(withTarget)
+
+        with:SetCallback("OnValueChanged", function(widget, event, value)
+            withValue = value
+            if value == 'player' then
+                withTarget:SetDisabled(false)
+            else
+                withTarget:SetDisabled(true)
+            end
+        end)
+        with:SetValue("group")
+
+        shareW:SetCallback("OnClick", function(widget, event, okay)
+            if okay == true then
+                if withValue == "group" then
+                    self:SendNote(note)
+                elseif withValue == "player" then
+                    self:SendNote(note, "WHISPER", withTargetVal)
+                end
+            end
+        end)
+
+        shareW:Show()
+        return shareW
     end
 end

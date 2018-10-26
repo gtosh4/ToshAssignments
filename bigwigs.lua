@@ -85,11 +85,36 @@ do
         return true
     end
 
+    function hookPrototype:checkEventNumber(assignment, spellId)
+        local print = assignment.name == "FB 2-3" and function(...) ta:Print(...) end or function() end
+        local spellMeta = self.spellMeta[spellId]
+        local matchFunc = function(part)
+            for lower, upper in part:gmatch("(%d+)%-(%d+)") do
+                lower, upper = tonumber(lower), tonumber(upper)
+                if (lower and upper) and spellMeta.number >= lower and spellMeta.number <= upper then
+                    return true
+                end
+            end
+            if tonumber(part) then
+                return spellMeta.number == tonumber(part)
+            elseif part == "*" then
+                return true
+            end
+            return false
+        end
+
+        for match in assignment.trigger.eventNumber:gmatch("(.-),") do
+            if matchFunc(elem) then
+                return true
+            end
+        end
+        return matchFunc(assignment.trigger.eventNumber)
+    end
+
     local SetRaidTarget = SetRaidTarget
     local function applyMarks(marks)
         for player, markerType in pairs(marks) do
             local iconId = tonumber(markerType:sub(7))
-            -- ta:Printf("Setting %s to %s", player, ns.raidIconStrings[iconId])
             SetRaidTarget(player, iconId)
         end
     end
@@ -98,17 +123,20 @@ do
         if (type(key) ~= 'number') or (not self.encounter) then return end
 
         local now = GetTime()
+        self.spellMeta = self.spellMeta or {}
+        self.spellMeta[key] = self.spellMeta[key] or {}
+        local spellMeta = self.spellMeta[key]
+        spellMeta.number = (spellMeta.number or 0) + 1
 
         local barEndTime = now + length
         for _, note in pairs(self.encounter) do
             if note.enabled then
                 for _, assign in pairs(note.assignments) do
-                    if self:assignedToMe(note, assign) then
+                    if self:assignedToMe(note, assign) and self:checkEventNumber(assign, key) then
 
                         if assign.trigger.type == 'spell' then
                             local tspellId = assign.trigger.spellId
                             if tspellId and tspellId == key then
-                                -- ta:Printf("Firing for spell %s (%d) in %d", GetSpellInfo(tspellId), tspellId, length)
                                 local assignEndTime = barEndTime - (assign.trigger.before or 0)
 
                                 for _, action in pairs(assign.actions) do
@@ -124,11 +152,11 @@ do
                                         end
 
                                         if actionStartTime <= now then
-                                            self:SendMessage("BigWigs_StartBar", self.plugin, assign.name, assign.name, assignEndTime - now)
+                                            self:SendMessage("BigWigs_StartBar", self.plugin, assign.name, assign.name, assignEndTime - now, actionIcon)
                                         else
                                             self:ScheduleTimer(
                                                 function()
-                                                    self:SendMessage("BigWigs_StartBar", self.plugin, assign.name, assign.name, action.bar.duration)
+                                                    self:SendMessage("BigWigs_StartBar", self.plugin, assign.name, assign.name, action.bar.duration, actionIcon)
                                                 end,
                                                 actionStartTime - now
                                             )
@@ -136,7 +164,6 @@ do
                                         -- end 'bar'
                                     elseif action.type == 'marker' then
                                         if assignEndTime > now then
-                                            -- ta:Printf("Scheduling mark for %s.%s.%d in %d", note.name, assign.name, action.id, assignEndTime - now)
                                             self:ScheduleTimer(applyMarks, assignEndTime - now, action.marker.marks)
                                         else
                                             applyMarks(action.marker.marks)
