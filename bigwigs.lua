@@ -10,8 +10,6 @@ do
     local loaded = false
     local AceHook = LibStub("AceHook-3.0")
 
-    local GetTime, UnitName = GetTime, UnitName
-
     function ns:LoadBigWigs()
         if not loaded then
             plugin, CL = BigWigs:NewPlugin("ToshAssignments")
@@ -36,6 +34,7 @@ do
                     local hook = setmetatable({
                         plugin = self,
                         encounter = ta.db.profile.encounters[module.journalId],
+                        bossModule = module,
 
                         -- Embed callback handler
                         RegisterMessage = self.RegisterMessage,
@@ -54,8 +53,10 @@ do
 
                     hook:Hook(module, "Bar", "StartBar", false)
                     hook:Hook(module, "CDBar", "StartBar", false)
-                    self:RegisterMessage("BigWigs_OnBossWin", function() hook:EndEncounter() end)
-                    self:RegisterMessage("BigWigs_OnBossWipe", function() hook:EndEncounter() end)
+                    self:RegisterMessage("BigWigs_OnBossWin", function(...) hook:EndEncounter(...) end)
+                    self:RegisterMessage("BigWigs_OnBossWipe", function(...) hook:EndEncounter(...) end)
+                    hook:RegisterEvent("ENCOUNTER_START", function(...) hook:ENCOUNTER_START(...) end)
+                    hook:RegisterEvent("ENCOUNTER_END", function(...) hook:ENCOUNTER_END(...) end)
 
                     hooks[name] = hook
                 end
@@ -68,6 +69,31 @@ do
 end
 
 do
+    local GetTime, UnitName = GetTime, UnitName
+
+    function hookPrototype:ENCOUNTER_START(_, id)
+        if id == self.bossModule.engageId then
+            self.encounterStart = GetTime()
+            
+            for _, note in pairs(self.encounter) do
+                if note.enabled then
+                    for _, assign in pairs(note.assignments) do
+                        if assign.trigger.type == 'time' and self:assignedToMe(note, assign) then
+                            local assignEndTime = self.encounterStart + assign.trigger.time.encounterTime
+                            self:handleAssign(note, assign, assignEndTime)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    function hookPrototype:ENCOUNTER_END(_, id)
+        if id == self.bossModule.engageId then
+            self.encounterStart = nil
+        end
+    end
+
     function hookPrototype:EndEncounter()
         self:CancelAllTimers()
     end
@@ -79,7 +105,7 @@ do
                 if assignPlayer == self.player then
                     return true
                 end
-            end 
+            end
             return false
         end
         return true
@@ -103,12 +129,12 @@ do
             return false
         end
 
-        for match in assignment.trigger.eventNumber:gmatch("(.-),") do
+        for match in assignment.trigger.spell.eventNumber:gmatch("(.-),") do
             if matchFunc(elem) then
                 return true
             end
         end
-        return matchFunc(assignment.trigger.eventNumber)
+        return matchFunc(assignment.trigger.spell.eventNumber)
     end
 
     local SetRaidTarget = SetRaidTarget
@@ -116,6 +142,44 @@ do
         for player, markerType in pairs(marks) do
             local iconId = tonumber(markerType:sub(7))
             SetRaidTarget(player, iconId)
+        end
+    end
+
+    function hookPrototype:handleAssign(note, assign, assignEndTime)
+        ViragDevTool_AddData(assign, note.name .. "-" .. assign.name)
+        local now = GetTime()
+        for _, action in pairs(assign.actions) do
+            if action.type == 'bar' then
+                local actionStartTime = assignEndTime - action.bar.duration
+                local actionIcon
+                if action.bar.icon == 'auto' then
+                    actionIcon = icon
+                elseif action.bar.icon:sub(1,6) == "marker" then
+                    actionIcon = ns.raidIconNumbers[tonumber(action.bar.icon:sub(7))]
+                elseif tonumber(action.bar.icon) then
+                    actionIcon = tonumber(action.bar.icon)
+                end
+
+                if actionStartTime <= now then
+                    ta:Print("StartBar", note.name, assign.name, action.id, "in", (actionStartTime - now))
+                    self:SendMessage("BigWigs_StartBar", self.plugin, assign.name, assign.name, assignEndTime - now, actionIcon)
+                else
+                    ta:Print("StartBar", note.name, assign.name, action.id, "in", (actionStartTime - now))
+                    self:ScheduleTimer(
+                        function()
+                            self:SendMessage("BigWigs_StartBar", self.plugin, assign.name, assign.name, action.bar.duration, actionIcon)
+                        end,
+                        actionStartTime - now
+                    )
+                end
+                -- end 'bar'
+            elseif action.type == 'marker' then
+                if assignEndTime > now then
+                    self:ScheduleTimer(applyMarks, assignEndTime - now, action.marker.marks)
+                else
+                    applyMarks(action.marker.marks)
+                end
+            end
         end
     end
 
@@ -132,50 +196,15 @@ do
         for _, note in pairs(self.encounter) do
             if note.enabled then
                 for _, assign in pairs(note.assignments) do
-                    if self:assignedToMe(note, assign) and self:checkEventNumber(assign, key) then
-
-                        if assign.trigger.type == 'spell' then
-                            local tspellId = assign.trigger.spellId
-                            if tspellId and tspellId == key then
-                                local assignEndTime = barEndTime - (assign.trigger.before or 0)
-
-                                for _, action in pairs(assign.actions) do
-                                    if action.type == 'bar' then
-                                        local actionStartTime = assignEndTime - action.bar.duration
-                                        local actionIcon
-                                        if action.bar.icon == 'auto' then
-                                            actionIcon = icon
-                                        elseif action.bar.icon:sub(1,6) == "marker" then
-                                            actionIcon = ns.raidIconNumbers[tonumber(action.bar.icon:sub(7))]
-                                        elseif tonumber(action.bar.icon) then
-                                            actionIcon = tonumber(action.bar.icon)
-                                        end
-
-                                        if actionStartTime <= now then
-                                            self:SendMessage("BigWigs_StartBar", self.plugin, assign.name, assign.name, assignEndTime - now, actionIcon)
-                                        else
-                                            self:ScheduleTimer(
-                                                function()
-                                                    self:SendMessage("BigWigs_StartBar", self.plugin, assign.name, assign.name, action.bar.duration, actionIcon)
-                                                end,
-                                                actionStartTime - now
-                                            )
-                                        end
-                                        -- end 'bar'
-                                    elseif action.type == 'marker' then
-                                        if assignEndTime > now then
-                                            self:ScheduleTimer(applyMarks, assignEndTime - now, action.marker.marks)
-                                        else
-                                            applyMarks(action.marker.marks)
-                                        end
-                                    end
-                                end -- Action
-                            end
-                        end -- Trigger 'spell'
-
-                    end -- if assigned
-                end -- Assign
+                    if assign.trigger.type == 'spell' and self:assignedToMe(note, assign) and self:checkEventNumber(assign, key) then
+                        local tspellId = assign.trigger.spell.spellId
+                        if tspellId and tspellId == key then
+                            local assignEndTime = barEndTime - assign.trigger.spell.before
+                            self:handleAssign(note, assign, assignEndTime)
+                        end
+                    end 
+                end
             end
-        end -- Note
+        end
     end
 end

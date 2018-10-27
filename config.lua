@@ -114,6 +114,7 @@ do
                 addAssignment(assignment)
                 ta:ShowAssignment(note, assignment)
             end,
+            width = 'full',
             order = -1,
         }
 

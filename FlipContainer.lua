@@ -35,6 +35,7 @@ local methods = {
 		self:SetWidth(300)
     self:SetHeight(100)
     self:SetLayout("Fill")
+    wipe(self.pages)
   end,
   
   ["AddPage"] = function(self, name, page)
@@ -56,8 +57,9 @@ local methods = {
       end
       if (not old) or (old ~= page) then
         self.children[1] = page
-        self:Fire("OnShowPage", name)
         page.frame:Show()
+        self:Fire("OnShowPage", name)
+        page:Fire("OnShow")
         self:DoLayout()
       end
     end

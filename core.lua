@@ -159,12 +159,18 @@ do -- Add metatables/functions
         end
     end
 
+    local defaultSpellConfig = {
+        eventNumber = "*",
+        before = 0,
+    }
+
+    local defaultTimeConfig = {
+        encounterTime = 0,
+    }
+
     function ta:DecorateAssignment(assignment)
-        if assignment.trigger.type == 'cast' or assignment.trigger.type == 'aura' then
-            assignment.trigger.type = 'spell'
-        end
-        assignment.trigger.eventNumber = assignment.trigger.eventNumber or "*"
-        assignment.onPlayersChange = function() end -- Dummy function to hook
+        assignment.trigger.spell = setmetatable(assignment.trigger.spell or {}, {__index = defaultSpellConfig})
+        assignment.trigger.time = setmetatable(assignment.trigger.time or {}, {__index = defaultTimeConfig})
         for _, action in pairs(assignment.actions) do
             self:DecorateAction(action)
         end
@@ -202,4 +208,8 @@ do
         -- Texture id list for raid icons 1-8 is 137001-137008
         ns.raidIconNumbers[k] = k+137000
     end
+end
+
+function ta:DumpNote(note)
+    if ViragDevTool_AddData then ViragDevTool_AddData(note, note.name) end
 end

@@ -4,12 +4,6 @@ local ta = ns.ta
 do
     local gui = LibStub("AceGUI-3.0")
 
-    local triggerTypes = {
-        time = 'Time',
-        spell = 'Spell',
-        add = 'Add',
-    }
-
     local windows = {}
 
     local function sectionBreak()
@@ -95,7 +89,6 @@ do
                         else
                             tremove(assignment.players, idx)
                         end
-                        assignment.onPlayersChange()
                     end)
                 end
                 local newPlayerBox = gui:Create("EditBox")
@@ -119,82 +112,65 @@ do
             redrawPlayerBoxes()
         end)
         assignToPlayers:SetValue(assignment.players ~= nil)
-        redrawPlayerBoxes() -- Have to manually call it because OnValueChanged is only fired for the mouse even on CheckBox
+        redrawPlayerBoxes() -- Have to manually call it because OnValueChanged is only fired for the mouse/enter key event on CheckBox
 
         return gen
     end
 
-    local function triggerGroup(note, assignment)
-        local trigger = gui:Create("SimpleGroup")
-        trigger:SetLayout("Flow")
-        assignment.trigger = assignment.trigger or {}
+    local triggerTypes = {
+        time = 'Time',
+        spell = 'Spell',
+    }
 
-        local ttype = gui:Create("Dropdown")
-        ttype:SetLabel("Type")
-        ttype:SetList(triggerTypes)
-        trigger:AddChild(ttype)
+    local function spellTrigger(note, assignment)
+        assignment.trigger.spell = assignment.trigger.spell or {}
+
+        local g = gui:Create("SimpleGroup")
+        g:SetFullHeight(true)
+        g:SetFullWidth(true)
+        g:SetLayout("Flow")
+
+        local spells = gui:Create("Dropdown")
 
         local spellList = {}
         for _, i in ipairs(ns.encounterSpells[note.encounterId] or {}) do
             local name, _, icon = GetSpellInfo(i)
             spellList[i] = "|T"..icon..":0|t"..name
         end
-        local spells = gui:Create("Dropdown")
+        spellList[0] = "Manual"
         spells:SetList(spellList)
-        spells:AddItem(0, "Manual")
-        spells:SetDisabled(true)
-        trigger:AddChild(spells)
-
-        local spellsinputC = gui:Create('FlipContainer')
-        spellsinputC:SetLayout("Flow")
-        trigger:AddChild(spellsinputC)
+        g:AddChild(spells)
 
         local si = gui:Create("EditBox")
         si:SetLabel("Spell Id")
         si:SetCallback("OnEnterPressed", function(widget, event, text)
             local n = tonumber(text)
             if n then
-                assignment.trigger.spellId = n
+                assignment.trigger.spell.spellId = n
             end
         end)
-        si:SetWidth(100)
-        spellsinputC:AddPage("spellid", si)
-        spellsinputC:SetWidth(100)
+        si:SetWidth(120)
+        g:AddChild(si)
 
-        spells:SetCallback("OnValueChanged", function(widget, event, key)
-            if key == 0 then
-                spellsinputC:ShowPage("spellid")
+        local updateSpellId = function(spellId)
+            if not spellList[spellId] then
+                spells:SetValue(0)
+            end
+            if spellId == 0 or (not spellList[spellId]) then
+                si:SetDisabled(false)
+                si:SetText(assignment.trigger.spell.spellId)
             else
-                assignment.trigger.spellId = key
-                spellsinputC:Hide()
-            end
-        end)
-
-        ttype:SetCallback("OnValueChanged", function(widget, event, key)
-            if key == 'spell' then
-                spells:SetDisabled(false)
-            else
-                spells:SetDisabled(true)
-            end
-            assignment.trigger.type = key
-        end)
-
-        ttype:SetValue(assignment.trigger.type)
-        if assignment.trigger.type == 'spell' then
-            spells:SetDisabled(false)
-
-            if assignment.trigger.spellId then
-                if spellList[assignment.trigger.spellId] then
-                    spells:SetValue(assignment.trigger.spellId)
-                else
-                    spells:SetValue(0)
-                    spellsinput:SetDisabled(false)
-                    spellsinput:SetText(tostring(assignment.trigger.spellId))
-                end
+                assignment.trigger.spell.spellId = spellId
+                si:SetText()
+                si:SetDisabled(true)
+                spells:SetValue(spellId) -- Note this won't cause recursive call because SetValue does not cause OnValueChange to fire (annoyingly)
             end
         end
 
-        trigger:AddChild(sectionBreak())
+        spells:SetCallback("OnValueChanged", function(widget, event, key)
+            updateSpellId(key)
+        end)
+        
 
         local timing = dynamicSlider()
         timing:SetValue(assignment.trigger.before or 0)
@@ -202,12 +178,12 @@ do
         timing:SetCallback("OnMouseUp", function(widget, event, value)
             assignment.trigger.before = value
         end)
-        trigger:AddChild(timing)
+        g:AddChild(timing)
 
         local numberC = gui:Create("InlineGroup")
         numberC:SetFullWidth(true)
         numberC:SetTitle("Event Number")
-        trigger:AddChild(numberC)
+        g:AddChild(numberC)
 
         local numberDesc = gui:Create("Label")
         numberDesc:SetText("Which cast/add/etc numbers does this assignment apply?|n* = all events|nYou can specify ranges such as 1-3|nor comma separated lists such as 1,3,5,7")
@@ -222,6 +198,64 @@ do
             assignment.trigger.eventNumber = text or "*"
         end)
         numberC:AddChild(number)
+
+        g:SetCallback("OnShow", function()
+            updateSpellId(assignment.trigger.spell.spellId)
+        end)
+
+        return g
+    end
+    
+    local function timeTrigger(note, assignment)
+        assignment.trigger.time = assignment.trigger.time or {}
+
+        local g = gui:Create("SimpleGroup")
+        g:SetFullHeight(true)
+        g:SetFullWidth(true)
+
+        local encounterTime = dynamicSlider()
+        encounterTime:SetLabel("Encounter Time (seconds)")
+        encounterTime:SetCallback("OnMouseUp", function(widget, event, value)
+            assignment.trigger.time.encounterTime = value
+        end)
+        g:AddChild(encounterTime)
+
+        g:SetCallback("OnShow", function()
+            assignment.trigger.time.encounterTime = assignment.trigger.time.encounterTime or 0
+            encounterTime:SetValue(assignment.trigger.time.encounterTime)
+        end)
+
+        return g
+    end
+
+    local function triggerGroup(note, assignment)
+        assignment.trigger = assignment.trigger or {}
+
+        local trigger = gui:Create("DropdownGroup")
+        trigger:SetFullWidth(true)
+        trigger:SetFullHeight(true)
+        trigger:SetLayout("Fill")
+        trigger:SetTitle("Type")
+        trigger:SetGroupList(triggerTypes)
+
+        local tscroll = gui:Create("ScrollFrame")
+        tscroll:SetLayout("Flow")
+        trigger:AddChild(tscroll)
+
+        local flip = gui:Create("FlipContainer")
+        tscroll:AddChild(flip)
+
+        flip:AddPage("spell", spellTrigger(note, assignment))
+        flip:AddPage("time", timeTrigger(note, assignment))
+
+        trigger:SetCallback("OnGroupSelected", function(widget, event, key)
+            flip:ShowPage(key)
+            assignment.trigger.type = key
+        end)
+
+        trigger:SetCallback("OnShow", function()
+            trigger:SetGroup(assignment.trigger.type)
+        end)
 
         return trigger
     end
@@ -481,6 +515,7 @@ do
         w:SetCallback("OnClose", function(widget)
             gui:Release(widget)
             windows[windowKey] = nil
+            self:DumpNote(note)
         end)
         windows[windowKey] = w
 
