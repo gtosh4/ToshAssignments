@@ -220,7 +220,7 @@ do
                     name = raid.name,
                     type = 'group',
                     args = {},
-                    order = (maxraids - idx),
+                    order = 10+(maxraids - idx),
                 }
                 for eIdx, encounter in ipairs(raid.encounters) do
                     local eo = encounterOptions(encounter)

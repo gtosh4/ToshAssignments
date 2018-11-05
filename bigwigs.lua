@@ -6,66 +6,92 @@ local plugin, CL
 local hookPrototype = {}
 local hooks = {}
 
-do
-    local loaded = false
-    local AceHook = LibStub("AceHook-3.0")
+local function initPlugin()
+    plugin, CL = BigWigs:NewPlugin("ToshAssignments")
+    if not plugin then return end
 
-    function ns:LoadBigWigs()
-        if not loaded then
-            plugin, CL = BigWigs:NewPlugin("ToshAssignments")
-
-            plugin.displayName = "Tosh |cff327da3Assignments|r"
-            AceHook:Embed(plugin)
-            AceHook:Embed(hookPrototype)
-            hookPrototype.player = UnitName("player")
-            local hookMeta = {__index = hookPrototype, __metatable = false }
-            
-            function plugin:OnPluginEnable()
-                self:RegisterMessage("BigWigs_BossModuleRegistered")
-                for name, module in BigWigs:IterateBossModules() do
-                    self:BigWigs_BossModuleRegistered(nil, name, module)
-                end
-            end
-
-            function plugin:BigWigs_BossModuleRegistered(_, name, module)
-                if hooks[name] then return end
-                
-                if module.journalId and ta.db.profile.encounters[module.journalId] then
-                    local hook = setmetatable({
-                        plugin = self,
-                        encounter = ta.db.profile.encounters[module.journalId],
-                        bossModule = module,
-
-                        -- Embed callback handler
-                        RegisterMessage = self.RegisterMessage,
-                        UnregisterMessage = self.UnregisterMessage,
-                        SendMessage = self.SendMessage,
-        
-                        -- Embed event handler
-                        RegisterEvent = self.RegisterEvent,
-                        UnregisterEvent = self.UnregisterEvent,
-
-                        -- Embed Timer
-                        ScheduleTimer = self.ScheduleTimer,
-                        CancelAllTimers = self.CancelAllTimers,
-                        CancelTimer = self.CancelTimer,
-                    }, hookMeta)
-
-                    hook:Hook(module, "Bar", "StartBar", false)
-                    hook:Hook(module, "CDBar", "StartBar", false)
-                    self:RegisterMessage("BigWigs_OnBossWin", function(...) hook:EndEncounter(...) end)
-                    self:RegisterMessage("BigWigs_OnBossWipe", function(...) hook:EndEncounter(...) end)
-                    hook:RegisterEvent("ENCOUNTER_START", function(...) hook:ENCOUNTER_START(...) end)
-                    hook:RegisterEvent("ENCOUNTER_END", function(...) hook:ENCOUNTER_END(...) end)
-
-                    hooks[name] = hook
-                end
-            end
-
-            ta:Print("BigWigs plugin loaded")
-            loaded = true
+    plugin.displayName = "Tosh |cff327da3Assignments|r"
+    AceHook:Embed(plugin)
+    AceHook:Embed(hookPrototype)
+    hookPrototype.player = UnitName("player")
+    local hookMeta = {__index = hookPrototype, __metatable = false }
+    
+    function plugin:OnPluginEnable()
+        self:RegisterMessage("BigWigs_BossModuleRegistered")
+        for name, module in BigWigs:IterateBossModules() do
+            self:BigWigs_BossModuleRegistered(nil, name, module)
         end
     end
+
+    function plugin:Log(boss, event, _, ...)
+        if eid and plugin.encounter then
+            local spells = ta.db.global.encounterSpells[boss.journalId]
+            for i = 1, select("#", ...) do
+                local id = select(i, ...)
+                if id and GetSpellInfo(id) then
+                    tinsert(spells, id)
+                    -- ta:Print(boss.moduleName, "spell", id, GetSpellInfo(id))
+                end
+            end
+            -- ViragDevTool_AddData(spells, boss.modeleName .. "_spells")
+        end
+    end
+
+    function plugin:BigWigs_BossModuleRegistered(_, name, module)
+        if not module.journalId then return end
+        if hooks[name] then return end
+        self:Hook(module, "Log", "Log", false)
+
+        plugin.encounter = ns:GetEncounterById(module.journalId)
+        if module.journalId == 1731 then
+            ViragDevTool_AddData({name=name, module=module, encounter=plugin.encounter}, "bw_"..name.."_encounter")
+        end
+        if plugin.encounter then
+            plugin.encounter.load = function()
+                module:Enable()
+            end
+        end
+        
+        if module.journalId and ta.db.profile.encounters[module.journalId] then
+            local hook = setmetatable({
+                plugin = self,
+                encounter = ta.db.profile.encounters[module.journalId],
+                bossModule = module,
+
+                -- Embed callback handler
+                RegisterMessage = self.RegisterMessage,
+                UnregisterMessage = self.UnregisterMessage,
+                SendMessage = self.SendMessage,
+
+                -- Embed event handler
+                RegisterEvent = self.RegisterEvent,
+                UnregisterEvent = self.UnregisterEvent,
+
+                -- Embed Timer
+                ScheduleTimer = self.ScheduleTimer,
+                CancelAllTimers = self.CancelAllTimers,
+                CancelTimer = self.CancelTimer,
+            }, hookMeta)
+
+            hook:Hook(module, "Bar", "StartBar", false)
+            hook:Hook(module, "CDBar", "StartBar", false)
+            self:RegisterMessage("BigWigs_OnBossWin", function(...) hook:EndEncounter(...) end)
+            self:RegisterMessage("BigWigs_OnBossWipe", function(...) hook:EndEncounter(...) end)
+            hook:RegisterEvent("ENCOUNTER_START", function(...) hook:ENCOUNTER_START(...) end)
+            hook:RegisterEvent("ENCOUNTER_END", function(...) hook:ENCOUNTER_END(...) end)
+
+            hooks[name] = hook
+
+            ta:Print("Hooked", name)
+        end
+    end
+
+    function plugin:CheckOption(key, option)
+        return true
+    end
+
+    ta:Print("BigWigs plugin loaded")
+    loaded = true
 end
 
 do
@@ -96,6 +122,20 @@ do
 
     function hookPrototype:EndEncounter()
         self:CancelAllTimers()
+        
+        for _, note in pairs(self.encounter) do
+            for _, assign in pairs(note.assignments) do
+                for _, action in pairs(assign.actions) do
+                    local key = {
+                        note = note,
+                        assign = assign,
+                        action = action,
+                    }
+                    self:SendMessage("BigWigs_StopBar", self.plugin, key)
+                    self:SendMessage("BigWigs_StopEmphasize", self.plugin, key)
+                end
+            end
+        end
     end
 
     function hookPrototype:assignedToMe(note, assign)
@@ -112,7 +152,6 @@ do
     end
 
     function hookPrototype:checkEventNumber(assignment, spellId)
-        local print = assignment.name == "FB 2-3" and function(...) ta:Print(...) end or function() end
         local spellMeta = self.spellMeta[spellId]
         local matchFunc = function(part)
             for lower, upper in part:gmatch("(%d+)%-(%d+)") do
@@ -149,6 +188,12 @@ do
         ViragDevTool_AddData(assign, note.name .. "-" .. assign.name)
         local now = GetTime()
         for _, action in pairs(assign.actions) do
+            local key = {
+                note = note,
+                assign = assign,
+                action = action,
+            }
+
             if action.type == 'bar' then
                 local actionStartTime = assignEndTime - action.bar.duration
                 local actionIcon
@@ -161,24 +206,25 @@ do
                 end
 
                 if actionStartTime <= now then
-                    ta:Print("StartBar", note.name, assign.name, action.id, "in", (actionStartTime - now))
-                    self:SendMessage("BigWigs_StartBar", self.plugin, assign.name, assign.name, assignEndTime - now, actionIcon)
+                    self:SendMessage("BigWigs_StartBar", self.plugin, key, assign.name, assignEndTime - now, actionIcon)
                 else
-                    ta:Print("StartBar", note.name, assign.name, action.id, "in", (actionStartTime - now))
                     self:ScheduleTimer(
                         function()
-                            self:SendMessage("BigWigs_StartBar", self.plugin, assign.name, assign.name, action.bar.duration, actionIcon)
+                            self:SendMessage("BigWigs_StartBar", self.plugin, key, assign.name, action.bar.duration, actionIcon)
                         end,
                         actionStartTime - now
                     )
                 end
-                -- end 'bar'
+
             elseif action.type == 'marker' then
-                if assignEndTime > now then
-                    self:ScheduleTimer(applyMarks, assignEndTime - now, action.marker.marks)
-                else
+                if assignEndTime <= now then
                     applyMarks(action.marker.marks)
+                else
+                    self:ScheduleTimer(applyMarks, assignEndTime - now, action.marker.marks)
                 end
+
+            elseif action.type == 'countdown' then
+                self:SendMessage("BigWigs_StartEmphasize", self.plugin, key, assign.name, assignEndTime - now)
             end
         end
     end
@@ -205,6 +251,31 @@ do
                     end 
                 end
             end
+        end
+    end
+end
+
+local function loadInstance(instanceId)
+    local instanceAddon = BigWigsLoader.zoneTbl[instanceId]
+    if ns:IsAddOnEnabled(instanceAddon) then
+        local loaded, reason = LoadAddOn(instanceAddon)
+        if not loaded then
+            ta:Printf("Could not load %s addon for %d: %s", instanceAddon, instanceId, reason)
+            return
+        end
+    end
+end
+
+do
+    local loaded = false
+    local AceHook = LibStub("AceHook-3.0")
+
+    local tinsert, GetSpellInfo = table.insert, GetSpellInfo
+
+    function ns:LoadBigWigs_Core()
+        if not loaded then
+            initPlugin()
+            ns.LoadInstance = loadInstance
         end
     end
 end

@@ -5,6 +5,8 @@ do
     local EJ_GetEncounterInfoByIndex, EJ_GetCurrentTier, EJ_SelectInstance, EJ_SelectTier, EJ_GetTierInfo, EJ_GetInstanceByIndex =
           EJ_GetEncounterInfoByIndex, EJ_GetCurrentTier, EJ_SelectInstance, EJ_SelectTier, EJ_GetTierInfo, EJ_GetInstanceByIndex
 
+    local encounterById = {}
+
     local function encounters(instanceId)
         EJ_SelectInstance(instanceId)
         
@@ -14,15 +16,16 @@ do
         while true do
             local info = { EJ_GetEncounterInfoByIndex(index, instanceId) }
             if not info[1] then break end
-            local encounter = {
-                instanceId = instanceId,
+            local encounter = encounterById[info[3]] or {
                 name = info[1],
                 desc = info[2],
                 encounterId = info[3],
                 rootSectionID = info[4],
                 link = info[5],
             }
+            encounter.instanceId = instanceId
             es[index] = encounter
+            encounterById[encounter.encounterId] = encounterById[encounter.encounterId] or encounter
             index = index + 1
         end
 
@@ -78,11 +81,31 @@ do
         return tier
     end
 
-    function ns:GetInstanceById(id)
-        local i = instancesById[id]
-        if not i then
-            ta:Printf("No instance for id %d", id)
+    function ns:LoadEncounters()
+        for i=1,EJ_GetNumTiers() do
+            self:GetTier(i)
         end
-        return i
+    end
+
+    function ns:GetInstanceById(id)
+        return instancesById[id]
+    end
+
+    function ns:GetEncounterById(id)
+        local encounter = encounterById[id]
+        if not encounter then
+            local info = { EJ_GetEncounterInfo(id) }
+            if info[1] then
+                encounter = {
+                    name = info[1],
+                    desc = info[2],
+                    encounterId = info[3],
+                    rootSectionID = info[4],
+                    link = info[5],
+                }
+                encounterById[encounter.encounterId] = encounterById[encounter.encounterId] or encounter
+            end
+        end
+        return encounter
     end
 end

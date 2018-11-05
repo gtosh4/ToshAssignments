@@ -5,6 +5,9 @@ ns.ta = ta
 do
     local defaultProfile = {
         global = {
+            encounterSpells = {
+                ["*"] = {},
+            }
         },
         profile = {
             encounters = {
@@ -26,16 +29,23 @@ do
         end
         self:RegisterChatCommand("ta", "SlashTA")
     end
+    
+    function ns:IsAddOnEnabled(addon)
+        local character = UnitName("player")
+        return GetAddOnEnableState(character, addon) > 0
+    end
 
     function ta:OnEnable()
         ta:RegisterMessage("ToshAssignments_UpdateConfig", function() ta:InitializeOptions(true) end)
 		self.db.RegisterCallback(ta, "OnProfileChanged", profileUpdate)
 		self.db.RegisterCallback(ta, "OnProfileCopied", profileUpdate)
-		self.db.RegisterCallback(ta, "OnProfileReset", profileUpdate)
-
-        if IsAddOnLoaded("BigWigs_Core") then
-            ns:LoadBigWigs()
+        self.db.RegisterCallback(ta, "OnProfileReset", profileUpdate)
+        
+        if ns:IsAddOnEnabled("BigWigs_Core") then
+            self.bossMod = BigWigs_Core
         end
+
+        self:LoadBossMod()
         self:RegisterEvent('ADDON_LOADED')
         self:RegisterEvent('PLAYER_ENTERING_WORLD')
         
@@ -44,8 +54,8 @@ do
 end
 
 function ta:ADDON_LOADED(event, addon)
-    if addon == "BigWigs_Core" then
-        ns:LoadBigWigs()
+    if self.bossMod and addon == bossMod then
+        self:LoadBossMod()
     end
 end
 
@@ -53,6 +63,11 @@ function ta:PLAYER_ENTERING_WORLD()
     ta:InitializeOptions()
 end
 
+function ta:LoadBossMod()
+    if self.bossMod and IsAddOnLoaded(self.bossMod) and type(ns["Load"..self.bossMod]) == "function" then
+        ns["Load"..self.bossMod](ns)
+    end
+end
 
 local testNote = {
     ["enabled"] = true,
@@ -130,10 +145,17 @@ do
         end
     end
 
-    function ta:SlashTA(option)
+    function ta:SlashTA(input)
+        local args = {}
+        for part in input:gmatch("[^ ]+") do
+            args[#args+1] = part
+        end
+        ViragDevTool_AddData(args, "SlashTA")
+        local option = args[1]
         if option == "test_transmit" then
             self:SendNote(testNote, "WHISPER", GetUnitName("player", true))
             return
+
         elseif option == "bw" then
             for i=1,GetNumAddOns() do
                 local name = GetAddOnInfo(i)
@@ -142,13 +164,24 @@ do
                     self:Print(name or "nil", loaded or "nil")
                 end
             end
+            return
+
+        elseif option == "modules" then
+            for name, module in BigWigs:IterateBossModules() do
+                ta:Print("BigWigs module", name, module.journalId or "nil")
+            end
+
+        elseif option == "db" then
+            ViragDevTool_AddData(self.db, "ToshAssignmentsDB")
+
+        else
+            local params = getCurrentInstanceParams()
+            if params then
+                AceConfigDialog:SelectGroup("ToshAssignments", unpack(params))
+            end
+            AceConfigDialog:Open("ToshAssignments")
         end
 
-        local params = getCurrentInstanceParams()
-        if params then
-            AceConfigDialog:SelectGroup("ToshAssignments", unpack(params))
-        end
-        AceConfigDialog:Open("ToshAssignments")
     end
 end
 

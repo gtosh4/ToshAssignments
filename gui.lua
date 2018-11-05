@@ -33,7 +33,7 @@ do
         return s
     end
 
-    local GetSpellInfo, tinsert, tremove = GetSpellInfo, table.insert, table.remove
+    local GetSpellInfo, tinsert, tremove, wipe = GetSpellInfo, table.insert, table.remove, wipe
 
     local function generalGroup(window, note, assignment)
         local gen = gui:Create("SimpleGroup")
@@ -131,14 +131,7 @@ do
         g:SetLayout("Flow")
 
         local spells = gui:Create("Dropdown")
-
         local spellList = {}
-        for _, i in ipairs(ns.encounterSpells[note.encounterId] or {}) do
-            local name, _, icon = GetSpellInfo(i)
-            spellList[i] = "|T"..icon..":0|t"..name
-        end
-        spellList[0] = "Manual"
-        spells:SetList(spellList)
         g:AddChild(spells)
 
         local si = gui:Create("EditBox")
@@ -200,6 +193,13 @@ do
         numberC:AddChild(number)
 
         g:SetCallback("OnShow", function()
+            for _, i in ipairs(ta.db.global.encounterSpells[note.encounterId]) do
+                local name, _, icon = GetSpellInfo(i)
+                spellList[i] = "|T"..icon..":0|t "..name
+            end
+            spellList[0] = "Manual"
+            spells:SetList(spellList)
+
             updateSpellId(assignment.trigger.spell.spellId)
         end)
 
@@ -263,6 +263,7 @@ do
     local actionTypes = {
         bar = "Bar",
         marker = "Marker",
+        countdown = 'Countdown',
     }
 
     local markerTypes = {
@@ -291,17 +292,20 @@ do
         container:SetLayout("Flow")
         a:AddChild(container)
 
+        --[[ GENERAL ]]--
+        local general = gui:Create("InlineGroup")
+        general:SetTitle("General")
+        container:AddChild(general)
+
         local delete = gui:Create("Button")
         delete:SetText("Delete")
         delete:SetCallback("OnClick", function(widget)
             local action = a:GetUserData("action")
-            if not action then
-                return
-            end
+            if not action then return end
             assignment.actions[action.id] = nil
             action.removeOptions()
         end)
-        container:AddChild(delete)
+        general:AddChild(delete)
 
         local flip = gui:Create('FlipContainer')
         flip:SetFullWidth(true)
@@ -317,9 +321,7 @@ do
         barDuration:SetLabel("Duration")
         barDuration:SetCallback("OnMouseUp", function(widget, event, value)
             local action = a:GetUserData("action")
-            if not action then
-                return
-            end
+            if not action then return end
             action.bar.duration = value
         end)
         bar:AddChild(barDuration)
@@ -332,6 +334,15 @@ do
             local action = a:GetUserData("action")
             if not action then return end
             action.bar.icon = value
+        end)
+        bar:SetCallback("OnShow", function(widget, event)
+            barDuration:SetSliderValues(0, 30, 0.1)
+
+            local action = a:GetUserData("action")
+            if not action then return end
+            
+            barDuration:SetValue(action.bar.duration)
+            barIcon:SetValue(action.bar.icon)
         end)
 
         --[[  MARKER  ]]--
@@ -395,19 +406,14 @@ do
                 end)
             end
         end
-        
-        flip:SetCallback("OnShowPage", function(widget, event, page)
-            local action = a:GetUserData("action")
-            if not action then return end
-
-            if page == 'bar' then
-                barDuration:SetSliderValues(0, 30, 0.1)
-                barDuration:SetValue(action.bar.duration)
-                barIcon:SetValue(action.bar.icon)
-            elseif page == 'marker' then
-                redrawMarkers()
-            end
+        marker:SetCallback("OnShow", function(widget, event)
+            redrawMarkers()
         end)
+
+        --[[ COUNTDOWN ]]--
+        local countdown = gui:Create("SimpleGroup")
+        countdown:SetLayout("Flow")
+        flip:AddPage('countdown', countdown)
         
         a:SetCallback("OnGroupSelected", function(widget, event, group)
             if not group or group == "" then
@@ -509,6 +515,21 @@ do
             gui:SetFocus(w)
             return
         end
+
+        self:LoadBossMod()
+
+        local encounterT = ns:GetEncounterById(note.encounterId)
+        if encounterT then
+            if encounterT.instanceId and type(ns.LoadInstance) == 'function' then
+                ns.LoadInstance(encounterT.instanceId)
+            end
+            -- ViragDevTool_AddData(encounterT, windowKey.."_encounter")
+            
+            if type(encounterT.load) == 'function' then
+                encounterT.load()
+            end
+        end
+
         w = gui:Create('Frame')
         w:SetLayout("Fill")
         w:SetTitle(assignment.name)
