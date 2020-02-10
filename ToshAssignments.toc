@@ -1,7 +1,7 @@
 ## Interface: 70300
 ## Title: Tosh |cff327da3Assignments|r
 ## Author: Tosh
-## Notes: Assignments and notifications transmission framework
+## Notes: Assignments and notifications transmission framework.
 ## Version: 0.0.1
 ## SavedVariables: ToshAssignmentsDB
 

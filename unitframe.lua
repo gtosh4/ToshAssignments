@@ -4,6 +4,8 @@ local encoder = ta.encoder
 
 local tconc = table.concat
 
+local mt = {}
+
 encoder.UF = encoder.NewType(1)
 
 local v1 = {version=1}
@@ -19,12 +21,12 @@ end
 function v1:decode(msg)
     local matcher = msg:gmatch("([^;]*);?")
     
-    return self.version, {
+    return self.version, setmetatable({
         uid = matcher(),
         duration = tonumber(matcher()),
         category = matcher(),
         spellid = tonumber(matcher()),
-    }
+    }, mt)
 end
 
 encoder.UF[v1.version] = v1
