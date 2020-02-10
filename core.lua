@@ -2,247 +2,47 @@ local addonName, ns = ...
 local ta = LibStub("AceAddon-3.0"):NewAddon("ToshAssignments", "AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0")
 ns.ta = ta
 
-do
-    local defaultProfile = {
-        global = {
-            encounterSpells = {
-                ["*"] = {},
-            }
-        },
-        profile = {
-            encounters = {
-                ["*"] = {},
-            },
-        },
-    }
+local IsInGroup, UnitName = IsInGroup, UnitName
 
-	local function profileUpdate()
-		ta:SendMessage("ToshAssignments_UpdateConfig")
-	end
-
-    function ta:OnInitialize()
-        self.db = LibStub("AceDB-3.0"):New("ToshAssignmentsDB", defaultProfile, true)
-        for _, encounter in pairs(self.db.profile.encounters) do
-            for _, note in pairs(encounter) do
-                self:DecorateNote(note)
-            end
-        end
-        self:RegisterChatCommand("ta", "SlashTA")
-    end
-    
-    function ns:IsAddOnEnabled(addon)
-        local character = UnitName("player")
-        return GetAddOnEnableState(character, addon) > 0
-    end
-
-    function ta:OnEnable()
-        ta:RegisterMessage("ToshAssignments_UpdateConfig", function() ta:InitializeOptions(true) end)
-		self.db.RegisterCallback(ta, "OnProfileChanged", profileUpdate)
-		self.db.RegisterCallback(ta, "OnProfileCopied", profileUpdate)
-        self.db.RegisterCallback(ta, "OnProfileReset", profileUpdate)
-        
-        if ns:IsAddOnEnabled("BigWigs_Core") then
-            self.bossMod = BigWigs_Core
-        end
-
-        self:LoadBossMod()
-        self:RegisterEvent('ADDON_LOADED')
-        self:RegisterEvent('PLAYER_ENTERING_WORLD')
-        
-        self:SetupSharing()
-    end
+function ta:Debug(...)
+    if ViragDevTool_AddData then ViragDevTool_AddData(...) end
 end
-
-function ta:ADDON_LOADED(event, addon)
-    if self.bossMod and addon == bossMod then
-        self:LoadBossMod()
-    end
-end
-
-function ta:PLAYER_ENTERING_WORLD()
-    ta:InitializeOptions()
-end
-
-function ta:LoadBossMod()
-    if self.bossMod and IsAddOnLoaded(self.bossMod) and type(ns["Load"..self.bossMod]) == "function" then
-        ns["Load"..self.bossMod](ns)
-    end
-end
-
-local testNote = {
-    ["enabled"] = true,
-    ["encounterId"] = 2168,
-    ["name"] = "Test Note",
-    ["assignments"] = {
-        {
-            ["name"] = "Tosh",
-            ["trigger"] = {
-                ["before"] = 2,
-                ["type"] = "cast",
-                ["spellId"] = 271296,
-            },
-            ["actions"] = {
-                {
-                    ["id"] = 1,
-                    ["type"] = "bar",
-                    ["bar"] = {
-                    },
-                }, -- [1]
-                {
-                    ["id"] = 2,
-                    ["type"] = "bar",
-                    ["bar"] = {
-                        ["duration"] = 15,
-                    },
-                }, -- [2]
-                {
-                    ["id"] = 3,
-                    ["type"] = "marker",
-                    ["bar"] = {
-                    },
-                }, -- [3]
-            },
-            ["id"] = 1,
-        }, -- [1]
-        {
-            ["name"] = "Assignment 2",
-            ["trigger"] = {
-            },
-            ["actions"] = {
-                {
-                    ["id"] = 1,
-                    ["type"] = "bar",
-                    ["bar"] = {
-                    },
-                }, -- [1]
-            },
-            ["id"] = 2,
-        }, -- [2]
-    },
-}
 
 do
-    local AceConfigDialog = LibStub("AceConfigDialog-3.0")
-    local GetBestMapForUnit, EJ_GetInstanceForMap, EJ_GetNumTiers, GetInstanceInfo = C_Map.GetBestMapForUnit, EJ_GetInstanceForMap, EJ_GetNumTiers, GetInstanceInfo
+    local function noop() end
 
-    local function getCurrentInstanceParams()
-        local mapID = GetBestMapForUnit("player")
-        local instanceID = mapID and EJ_GetInstanceForMap(mapID) or 0
-        local _, instanceType = GetInstanceInfo()
-        local instance = ns:GetInstanceById(instanceID)
-        if instance then
-            local maxTiers = EJ_GetNumTiers()
-            local params = {}
-            if instance.tier ~= maxTiers then
-                params[#params+1] = "legacy"
-                params[#params+1] = tostring(instance.tier)
-            end
-            if instanceType == "dungeon" then
-                params[#params+1] = "dungeons"
-            end
-            params[#params+1] = tostring(instanceID)
-            return params
-        end
-    end
-
-    function ta:SlashTA(input)
-        local args = {}
-        for part in input:gmatch("[^ ]+") do
-            args[#args+1] = part
-        end
-        ViragDevTool_AddData(args, "SlashTA")
-        local option = args[1]
-        if option == "test_transmit" then
-            self:SendNote(testNote, "WHISPER", GetUnitName("player", true))
-            return
-
-        elseif option == "bw" then
-            for i=1,GetNumAddOns() do
-                local name = GetAddOnInfo(i)
-                if name:sub(1, 7) == "BigWigs" then
-                    local loaded = IsAddOnLoaded(i)
-                    self:Print(name or "nil", loaded or "nil")
-                end
-            end
-            return
-
-        elseif option == "modules" then
-            for name, module in BigWigs:IterateBossModules() do
-                ta:Print("BigWigs module", name, module.journalId or "nil")
-            end
-
-        elseif option == "db" then
-            ViragDevTool_AddData(self.db, "ToshAssignmentsDB")
-
-        else
-            local params = getCurrentInstanceParams()
-            if params then
-                AceConfigDialog:SelectGroup("ToshAssignments", unpack(params))
-            end
-            AceConfigDialog:Open("ToshAssignments")
-        end
-
-    end
+    ta.Encode = noop
+    ta.Decode = noop
 end
 
-do -- Add metatables/functions
-    function ta:DecorateNote(note)
-        for _, assign in pairs(note.assignments) do
-            self:DecorateAssignment(assign)
-        end
-    end
-
-    local defaultSpellConfig = {
-        eventNumber = "*",
-        before = 0,
-    }
-
-    local defaultTimeConfig = {
-        encounterTime = 0,
-    }
-
-    function ta:DecorateAssignment(assignment)
-        assignment.trigger.spell = setmetatable(assignment.trigger.spell or {}, {__index = defaultSpellConfig})
-        assignment.trigger.time = setmetatable(assignment.trigger.time or {}, {__index = defaultTimeConfig})
-        for _, action in pairs(assignment.actions) do
-            self:DecorateAction(action)
-        end
-    end
-
-    local defaultBarConfig = {
-        duration = 10,
-        icon = 'none',
-    }
-
-    local defaultMarkerConfig = {
-        type = 'auto',
-    }
-
-    function ta:DecorateAction(action)
-        action.bar = setmetatable(action.bar or {}, {__index = defaultBarConfig})
-        action.marker = setmetatable(action.marker or {}, {__index = defaultMarkerConfig})
-    end
+-- Addon Comm Send/Receive
+function ta:OnCommReceived(...)
+    self:Debug({args=...}, "TOSH_ASSIGN OnCommReceived")
 end
 
-ns.raidIconStrings = {
-    [1] = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:0|t",
-    [2] = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_2:0|t",
-    [3] = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_3:0|t",
-    [4] = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_4:0|t",
-    [5] = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_5:0|t",
-    [6] = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_6:0|t",
-    [7] = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_7:0|t",
-    [8] = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_8:0|t",
-}
+ta:RegisterComm('TOSH_ASSIGN')
 
-ns.raidIconNumbers = {}
 do
-    for k,_ in pairs(ns.raidIconStrings) do
-        -- Texture id list for raid icons 1-8 is 137001-137008
-        ns.raidIconNumbers[k] = k+137000
+    local nextid = 1
+    function ta:SendAssign(atype, players, args)
+        local id = nextid
+        nextid = nextid+1
+
+        local chan, target = "RAID", nil
+        if not IsInGroup() then
+            chan = "WHISPER"
+            target = UnitName("player")
+        end
+
+        local v, msg = self:Encode(atype, id, players, args)
+        self:Debug({v=v, msg=msg, atype=atype, players=players, args=args}, "TOSH_ASSIGN SendAssign")
+        ta:SendCommMessage('TOSH_ASSIGN', msg, chan, target)
     end
 end
 
-function ta:DumpNote(note)
-    if ViragDevTool_AddData then ViragDevTool_AddData(note, note.name) end
+-- Local AceEvent Hooks/Translations
+function ta:TOSH_ASSIGN_SEND(atype, players, args)
+    self:SendAssign(atype, players, args)
 end
+
+ta:RegisterMessage("TOSH_ASSIGN_SEND")

@@ -1,7 +1,7 @@
 ## Interface: 70300
 ## Title: Tosh |cff327da3Assignments|r
 ## Author: Tosh
-## Notes: Assignments and notifications based on boss-mod timings
+## Notes: Assignments and notifications transmission framework
 ## Version: 0.0.1
 ## SavedVariables: ToshAssignmentsDB
 
@@ -9,13 +9,7 @@
 
 embeds.xml
 
-FlipContainer.lua
-DialogFrame.lua
-
 core.lua
-config.lua
-bigwigs.lua
-dbm.lua
-gui.lua
-sharing.lua
-encounters.lua
+encoding.lua
+
+types.xml
